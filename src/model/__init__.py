@@ -77,6 +77,8 @@ def get_model(model_cfg: DictConfig):
     model_cls = MODEL_REGISTRY[model_handler]
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
+        # Remove device_map from model_args since we pass it explicitly
+        model_args.pop("device_map", None)
     
     logger.info(f"Model path: {model_path}")
     logger.debug(f"Model args: {model_args}")

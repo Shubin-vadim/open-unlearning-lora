@@ -1,5 +1,6 @@
 import json
 import logging
+from utils.logging import get_logger
 import os
 from pathlib import Path
 from typing import Optional
@@ -16,7 +17,7 @@ load_dotenv(env_path)
 
 hf_home = os.getenv("HF_HOME", default=None)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_hf_token() -> Optional[str]:

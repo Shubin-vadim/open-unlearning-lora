@@ -2,8 +2,9 @@ import os
 import json
 import logging
 from evals.metrics import get_metrics
+from utils.logging import get_logger
 
-logger = logging.getLogger("evaluator")
+logger = get_logger("evaluator")
 
 
 class Evaluator:
@@ -47,7 +48,9 @@ class Evaluator:
 
     def load_metrics(self, metrics_cfg):
         """Load metrics for evaluation"""
+        logger.debug(f"Loading metrics from config: {list(metrics_cfg.keys())}")
         metrics = get_metrics(metrics_cfg)
+        logger.info(f"Loaded {len(metrics)} metric(s): {list(metrics.keys())}")
         return metrics
 
     def summarize(self, logs):

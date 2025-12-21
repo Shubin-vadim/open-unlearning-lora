@@ -8,8 +8,9 @@ from transformers import Trainer
 from torch.utils.data import Dataset
 from transformers.trainer_utils import PREFIX_CHECKPOINT_DIR
 from typing import Any
+from utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class FinetuneTrainer(Trainer):
@@ -27,6 +28,7 @@ class FinetuneTrainer(Trainer):
     ) -> Dict[str, float]:
         # Run a custom evaluator and save results
         if self.evaluators:
+            logger.info(f"Running custom evaluators: {list(self.evaluators.keys())}")
             if self.accelerator.is_local_main_process:
                 eval_metrics = {}
                 if self.accelerator.num_processes == 1:
@@ -36,16 +38,21 @@ class FinetuneTrainer(Trainer):
                     )
                     output_dir = os.path.join(run_dir, checkpoint_folder, "evals")
                     os.makedirs(output_dir, exist_ok=True)
+                    logger.info(f"Saving evaluation results to: {output_dir}")
                     eval_metrics = {}
-                    for _, evaluator in self.evaluators.items():
+                    for evaluator_name, evaluator in self.evaluators.items():
+                        logger.info(f"Running evaluator: {evaluator_name}")
                         eval_args = {
                             "output_dir": output_dir,
                             "template_args": self.template_args,
                             "model": self.model,
                             "tokenizer": self.tokenizer,
                         }
-                        eval_metrics.update(evaluator.evaluate(**eval_args))
+                        metrics = evaluator.evaluate(**eval_args)
+                        eval_metrics.update(metrics)
+                        logger.info(f"Evaluator {evaluator_name} completed with {len(metrics)} metrics")
                     self.log(eval_metrics)
+                    logger.info(f"Evaluation completed. Total metrics: {len(eval_metrics)}")
                 else:
                     logger.warning(
                         "Custom evaluator can be run with this Trainer only when a single accelerator process is running."
@@ -53,6 +60,8 @@ class FinetuneTrainer(Trainer):
                 return eval_metrics
 
         if eval_dataset is None:
+            logger.debug("No eval_dataset provided, returning empty metrics")
             return {}
         # Run the default HF Trainer evaluate method when eval dataset is provided
+        logger.info(f"Running default HF Trainer evaluation on eval_dataset with {len(eval_dataset)} samples")
         return super().evaluate(eval_dataset, ignore_keys, metric_key_prefix)

@@ -1,7 +1,10 @@
 import torch
 from torch.utils.data import Dataset
 
-from data.utils import load_hf_dataset, preprocess_chat_instance, add_dataset_index
+from data.utils import load_hf_dataset, preprocess_chat_instance
+from utils.logging import get_logger
+
+logger = get_logger(__name__), add_dataset_index
 
 
 class QADataset(Dataset):
@@ -19,18 +22,23 @@ class QADataset(Dataset):
         super(QADataset, self).__init__()
         self.tokenizer = tokenizer
         self.max_length = max_length
+        logger.info(f"Loading QA dataset with hf_args: {hf_args}")
         self.data = load_hf_dataset(**hf_args)
         self.data = add_dataset_index(self.data)
+        logger.info(f"Loaded {len(self.data)} QA samples")
         self.fs_data = None
         if few_shot_dataset_hf_args is not None:
+            logger.info(f"Loading few-shot dataset: {few_shot_dataset_hf_args}")
             raw_data = load_hf_dataset(**few_shot_dataset_hf_args)
             self.fs_data = {}
             self.fs_data[question_key] = raw_data[question_key]
             self.fs_data[answer_key] = raw_data[answer_key]
+            logger.info(f"Loaded {len(self.fs_data[question_key])} few-shot examples")
         self.template_args = template_args
         self.question_key = question_key
         self.answer_key = answer_key
         self.predict_with_generate = predict_with_generate
+        logger.debug(f"QADataset initialized: max_length={max_length}, predict_with_generate={predict_with_generate}")
 
     def __len__(self):
         return len(self.data)
@@ -79,7 +87,9 @@ class QAwithIdkDataset(QADataset):
     def __init__(self, idk_path, return_original=True, *args, **kwargs):
         self.idk_path = idk_path
         self.return_original = return_original
+        logger.info(f"Loading IDK responses from: {idk_path}")
         self.idk_responses = open(self.idk_path, "r").readlines()
+        logger.info(f"Loaded {len(self.idk_responses)} IDK responses")
         super().__init__(*args, **kwargs)
 
     def item_with_idk(self, question):

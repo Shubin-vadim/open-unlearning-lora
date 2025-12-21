@@ -1,10 +1,10 @@
 import torch
 from torch.utils.data import Dataset
 
-from data.utils import load_hf_dataset, preprocess_chat_instance
+from data.utils import load_hf_dataset, preprocess_chat_instance, add_dataset_index
 from utils.logging import get_logger
 
-logger = get_logger(__name__), add_dataset_index
+logger = get_logger(__name__)
 
 
 class QADataset(Dataset):

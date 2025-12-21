@@ -51,12 +51,22 @@ def load_trainer_args(trainer_args: DictConfig, dataset):
     if warmup_epochs:
         batch_size = trainer_args["per_device_train_batch_size"]
         grad_accum_steps = trainer_args["gradient_accumulation_steps"]
-        num_devices = torch.cuda.device_count()
-        dataset_len = len(dataset)
-        warmup_steps = int(
-            (warmup_epochs * dataset_len)
-            // (batch_size * grad_accum_steps * num_devices)
-        )
+        num_devices = torch.cuda.device_count() or 1  # Default to 1 if no CUDA devices
+        dataset_len = len(dataset) if dataset is not None else 0
+        
+        if dataset_len == 0:
+            logger.warning("Dataset is empty, setting warmup_steps to 0")
+            warmup_steps = 0
+        else:
+            denominator = batch_size * grad_accum_steps * num_devices
+            if denominator == 0:
+                logger.warning(f"Denominator is zero (batch_size={batch_size}, grad_accum_steps={grad_accum_steps}, num_devices={num_devices}), setting warmup_steps to 0")
+                warmup_steps = 0
+            else:
+                warmup_steps = int(
+                    (warmup_epochs * dataset_len)
+                    // denominator
+                )
         trainer_args["warmup_steps"] = warmup_steps
         logger.info(f"Calculated warmup_steps={warmup_steps} from warmup_epochs={warmup_epochs}, dataset_len={dataset_len}, batch_size={batch_size}, grad_accum_steps={grad_accum_steps}, num_devices={num_devices}")
 

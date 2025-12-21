@@ -1,23 +1,11 @@
+import logging
+from typing import Any, Dict
+
 import torch
-from typing import Dict, Any
 from omegaconf import DictConfig
-from transformers import Trainer, TrainingArguments
+from transformers import TrainingArguments, Trainer
 
 from trainer.base import FinetuneTrainer
-from trainer.unlearn.grad_ascent import GradAscent
-from trainer.unlearn.grad_diff import GradDiff
-from trainer.unlearn.npo import NPO
-from trainer.unlearn.dpo import DPO
-from trainer.unlearn.simnpo import SimNPO
-from trainer.unlearn.rmu import RMU
-from trainer.unlearn.undial import UNDIAL
-from trainer.unlearn.ceu import CEU
-from trainer.unlearn.satimp import SatImp
-from trainer.unlearn.wga import WGA
-from trainer.unlearn.pdu import PDU
-
-
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +14,34 @@ TRAINER_REGISTRY: Dict[str, Any] = {}
 
 def _register_trainer(trainer_class):
     TRAINER_REGISTRY[trainer_class.__name__] = trainer_class
+
+
+def _lazy_import_unlearn_trainers():
+    """Lazy import of unlearn trainers."""
+    from trainer.unlearn.grad_ascent import GradAscent
+    from trainer.unlearn.grad_diff import GradDiff
+    from trainer.unlearn.npo import NPO
+    from trainer.unlearn.dpo import DPO
+    from trainer.unlearn.simnpo import SimNPO
+    from trainer.unlearn.rmu import RMU
+    from trainer.unlearn.undial import UNDIAL
+    from trainer.unlearn.ceu import CEU
+    from trainer.unlearn.satimp import SatImp
+    from trainer.unlearn.wga import WGA
+    from trainer.unlearn.pdu import PDU
+    
+    # Register all unlearn trainers
+    _register_trainer(GradAscent)
+    _register_trainer(GradDiff)
+    _register_trainer(NPO)
+    _register_trainer(DPO)
+    _register_trainer(SimNPO)
+    _register_trainer(RMU)
+    _register_trainer(UNDIAL)
+    _register_trainer(CEU)
+    _register_trainer(SatImp)
+    _register_trainer(WGA)
+    _register_trainer(PDU)
 
 
 def load_trainer_args(trainer_args: DictConfig, dataset):
@@ -63,6 +79,10 @@ def load_trainer(
         f"{trainer_handler_name} handler not set"
     )
     trainer_cls = TRAINER_REGISTRY.get(trainer_handler_name, None)
+    # If trainer not found, try lazy loading unlearn trainers
+    if trainer_cls is None:
+        _lazy_import_unlearn_trainers()
+        trainer_cls = TRAINER_REGISTRY.get(trainer_handler_name, None)
     assert trainer_cls is not None, NotImplementedError(
         f"{trainer_handler_name} not implemented or not registered"
     )
@@ -87,15 +107,4 @@ def load_trainer(
 _register_trainer(Trainer)
 _register_trainer(FinetuneTrainer)
 
-# Register Unlearning Trainer
-_register_trainer(GradAscent)
-_register_trainer(GradDiff)
-_register_trainer(NPO)
-_register_trainer(DPO)
-_register_trainer(SimNPO)
-_register_trainer(RMU)
-_register_trainer(UNDIAL)
-_register_trainer(CEU)
-_register_trainer(SatImp)
-_register_trainer(WGA)
-_register_trainer(PDU)
+# Unlearn trainers are registered lazily via _lazy_import_unlearn_trainers()

@@ -1,15 +1,17 @@
-from typing import List
-from tqdm import tqdm
-from rouge_score import rouge_scorer
+import warnings
 from collections import defaultdict
-from omegaconf import OmegaConf
+from typing import List
+
 import numpy as np
 import scipy as sc
-from torch import nn
 import torch
-from transformers import StoppingCriteria, StoppingCriteriaList, PreTrainedTokenizer
+from omegaconf import OmegaConf
+from rouge_score import rouge_scorer
+from tqdm import tqdm
+from torch import nn
+from transformers import PreTrainedTokenizer, StoppingCriteria, StoppingCriteriaList
+
 from data.utils import IGNORE_INDEX
-import warnings
 
 
 def dict_transpose(evals):
@@ -291,6 +293,28 @@ def eval_text_similarity(model, tokenizer, batch, generation_args):
             tokenizer, stopwords, input_ids.shape[1], input_ids.shape[0]
         )
         generation_args["stopping_criteria"] = sc
+    
+    # Remove sampling-related parameters if do_sample is False to avoid warnings
+    # Convert do_sample to boolean explicitly to handle None, strings, etc.
+    do_sample = generation_args.get("do_sample", False)
+    if do_sample is None or (isinstance(do_sample, str) and do_sample.lower() == "false"):
+        do_sample = False
+    do_sample = bool(do_sample)
+    
+    # Sampling parameters that should be removed when do_sample=False
+    sampling_params = ["top_k", "top_p", "temperature"]
+    
+    if not do_sample:
+        # Remove all sampling-related parameters to avoid warnings
+        # These parameters are only used when do_sample=True
+        for key in sampling_params:
+            # Always remove these parameters when do_sample=False, regardless of their value
+            # This prevents warnings about unused sampling parameters
+            generation_args.pop(key, None)
+        
+        # Ensure do_sample is explicitly set to False to override any defaults
+        generation_args["do_sample"] = False
+    
     output = model.generate(
         input_ids,
         attention_mask=attention_mask,
@@ -306,7 +330,7 @@ def eval_text_similarity(model, tokenizer, batch, generation_args):
     # cut off at stopwords
     if stopwords is None:
         stopwords = []
-    stopwords = [tokenizer.decode([tokenizer.eos_token_id])] + stopwords
+    stopwords = [tokenizer.decode([tokenizer.eos_token_id])] + stopwords if tokenizer.eos_token_id is not None else []
     for i in range(len(gen_texts)):
         raw_text = gen_texts[i]
         for word in stopwords:

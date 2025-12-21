@@ -1,12 +1,14 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from peft import LoraConfig, get_peft_model, TaskType
-from omegaconf import DictConfig, open_dict, ListConfig
-from typing import Optional
-import torch
+import json
 import logging
 import os
 from pathlib import Path
+from typing import Optional
+
+import torch
 from dotenv import load_dotenv
+from omegaconf import DictConfig, ListConfig, open_dict
+from peft import LoraConfig, TaskType, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer
 
 # Load .env file from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -112,8 +114,6 @@ class LoRAModelForCausalLM:
 
         # Test JSON serialization to ensure compatibility
         try:
-            import json
-
             json.dumps(lora_params)
             logger.info("✅ LoRA parameters are JSON serializable")
         except Exception as e:
@@ -172,13 +172,13 @@ def get_lora_model(model_cfg: DictConfig):
     # Get torch dtype using the same logic as the main module
     torch_dtype = get_dtype(model_args)
 
-    with open_dict(model_args):
-        model_path = model_args.pop("pretrained_model_name_or_path", None)
-    
     # Get HuggingFace token from .env or environment variables
     hf_token = get_hf_token()
-    if hf_token and "token" not in model_args:
-        model_args["token"] = hf_token
+    
+    with open_dict(model_args):
+        model_path = model_args.pop("pretrained_model_name_or_path", None)
+        if hf_token and "token" not in model_args:
+            model_args["token"] = hf_token
 
     try:
         # Load model with LoRA
@@ -186,7 +186,6 @@ def get_lora_model(model_cfg: DictConfig):
             pretrained_model_name_or_path=model_path,
             lora_config=lora_config,
             torch_dtype=torch_dtype,
-            device_map="auto",
             cache_dir=hf_home,
             **model_args,
         )

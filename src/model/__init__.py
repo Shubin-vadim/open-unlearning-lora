@@ -88,7 +88,8 @@ def get_model(model_cfg: DictConfig):
     if hf_token:
         # Add token to model_args if not already present
         if "token" not in model_args:
-            model_args["token"] = hf_token
+            with open_dict(model_args):
+                model_args["token"] = hf_token
             logger.debug("Added HF token to model_args")
     
     try:

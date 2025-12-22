@@ -77,8 +77,7 @@ def get_model(model_cfg: DictConfig):
     model_cls = MODEL_REGISTRY[model_handler]
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
-        # Remove device_map from model_args since we pass it explicitly
-        model_args.pop("device_map", None)
+        # device_map will be handled later
     
     logger.info(f"Model path: {model_path}")
     logger.debug(f"Model args: {model_args}")
@@ -96,10 +95,12 @@ def get_model(model_cfg: DictConfig):
     
     try:
         logger.info(f"Loading model from {model_path}...")
+        # Use device_map from config or default to "auto" for GPU
+        device_map = model_args.pop("device_map", "auto")
         model = model_cls.from_pretrained(
             pretrained_model_name_or_path=model_path,
             torch_dtype=torch_dtype,
-            device_map="auto",
+            device_map=device_map,
             **model_args,
             cache_dir=hf_home,
         )

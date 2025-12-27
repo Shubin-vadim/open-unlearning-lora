@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import numpy as np
 from evals.metrics import get_metrics
 from utils.logging import get_logger
 
@@ -31,9 +32,29 @@ class Evaluator:
                 logs = json.load(f)
         return logs
 
+    def _convert_to_json_serializable(self, obj):
+        """Recursively convert NumPy types and other non-JSON-serializable types to native Python types."""
+        # Handle NumPy scalar types
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: self._convert_to_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._convert_to_json_serializable(item) for item in obj]
+        else:
+            return obj
+
     def save_logs(self, logs, file):
         """Save the logs in a json file"""
         logs = dict(sorted(logs.items()))
+        # Convert NumPy types and other non-JSON-serializable types to native Python types
+        logs = self._convert_to_json_serializable(logs)
         os.makedirs(os.path.dirname(file), exist_ok=True)
         try:
             with open(file, "w") as f:

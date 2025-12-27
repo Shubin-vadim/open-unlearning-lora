@@ -27,9 +27,22 @@ class Evaluator:
         """Returns the cache of existing results"""
         logs = {}
         if os.path.exists(file):
-            logger.info(f"Loading existing evaluations from {file}")
-            with open(file, "r") as f:
-                logs = json.load(f)
+            try:
+                logger.info(f"Loading existing evaluations from {file}")
+                with open(file, "r") as f:
+                    logs = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Failed to parse JSON file {file}: {e}. "
+                    "The file may be corrupted. Starting with empty logs and will regenerate the file."
+                )
+                logs = {}
+            except Exception as e:
+                logger.warning(
+                    f"Error loading logs from {file}: {e}. "
+                    "Starting with empty logs and will regenerate the file."
+                )
+                logs = {}
         return logs
 
     def _convert_to_json_serializable(self, obj):

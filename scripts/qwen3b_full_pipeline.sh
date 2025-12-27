@@ -12,7 +12,7 @@
 set -e  # Exit on error
 
 # Configuration
-MODEL="Qwen2.5-3B-Instruct"
+MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA for training
 FORGET_SPLIT="forget10"
 RETAIN_SPLIT="retain90"
 HOLDOUT_SPLIT="holdout10"
@@ -20,20 +20,24 @@ TRAINER="GradAscent"
 
 # Training parameters
 # Memory optimization: reduce batch size and increase gradient accumulation
-PER_DEVICE_TRAIN_BATCH_SIZE=2  # Reduced from 4 to save VRAM
-GRADIENT_ACCUMULATION_STEPS=8  # Increased from 4 to maintain effective batch size
+PER_DEVICE_TRAIN_BATCH_SIZE=1  # Reduced to 1 to save VRAM (minimum batch size)
+GRADIENT_ACCUMULATION_STEPS=16  # Increased to maintain effective batch size
 NUM_GPUS=1  # Number of GPUs to use
 GPU_IDS=0  # GPU device IDs (use 0 for single GPU, 0,1 for multi-GPU)
 
-# Additional memory-saving options (uncomment to enable if needed)
-# MAX_LENGTH=256  # Reduce sequence length (default: 512) - reduces VRAM significantly
+# Additional memory-saving options
+MAX_LENGTH=256  # Reduce sequence length (default: 512) - reduces VRAM significantly
+USE_8BIT_OPTIMIZER=true  # Use 8-bit optimizer to save memory (paged_adamw_32bit)
 
 # Set master port for distributed training
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
 echo "Master Port: $MASTER_PORT"
 
+# Set PyTorch CUDA memory allocation to reduce fragmentation
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
 echo "=========================================="
-echo "Qwen2.5-3B-Instruct Full Pipeline"
+echo "Qwen2.5-3B-Instruct Full Pipeline (LoRA)"
 echo "=========================================="
 echo "Model: $MODEL"
 echo "Forget Split: $FORGET_SPLIT"
@@ -46,12 +50,20 @@ echo "Effective Batch Size: $((PER_DEVICE_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATI
 echo "Gradient Checkpointing: Enabled (saves VRAM)"
 echo "=========================================="
 echo ""
-echo "Memory Optimization Tips:"
-echo "- If you still run out of VRAM, try:"
-echo "  1. Reduce PER_DEVICE_TRAIN_BATCH_SIZE to 1"
-echo "  2. Increase GRADIENT_ACCUMULATION_STEPS to 16"
-echo "  3. Uncomment MAX_LENGTH=256 to reduce sequence length"
-echo "  4. Consider using LoRA (see configs/experiment/finetune/tofu/lora.yaml)"
+echo "Memory Optimization Settings:"
+echo "- Base Model: $MODEL (original from HuggingFace)"
+echo "- Using LoRA: Yes (parameter-efficient fine-tuning)"
+echo "- Batch Size: $PER_DEVICE_TRAIN_BATCH_SIZE (minimum)"
+echo "- Gradient Accumulation: $GRADIENT_ACCUMULATION_STEPS"
+echo "- Max Length: ${MAX_LENGTH:-512} (reduced to save VRAM)"
+echo "- 8-bit Optimizer: ${USE_8BIT_OPTIMIZER:-false}"
+echo "- Gradient Checkpointing: Enabled"
+echo ""
+echo "LoRA Benefits:"
+echo "- Uses original model from HuggingFace"
+echo "- Trains only ~1% of model parameters (LoRA adapters)"
+echo "- Significantly reduced memory usage"
+echo "- Faster training and smaller checkpoints"
 echo ""
 
 ########################################################################################################################
@@ -92,8 +104,15 @@ FULL_TASK_NAME="tofu_${MODEL}_full"
 
 TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=train \
-    experiment=finetune/tofu/default \
+    experiment=finetune/tofu/lora \
     model=${MODEL} \
+    +model.use_lora=true \
+    +model.lora_config.target_modules='[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\",\"lm_head\"]' \
+    +model.lora_config.lora_alpha=128 \
+    +model.lora_config.lora_dropout=0.05 \
+    +model.lora_config.r=128 \
+    +model.lora_config.bias=none \
+    +model.lora_config.task_type=CAUSAL_LM \
     task_name=${FULL_TASK_NAME} \
     data/datasets@data.train=TOFU_QA_full \
     data.train.TOFU_QA_full.args.hf_args.name=full \
@@ -104,6 +123,14 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
 if [ -n "${MAX_LENGTH:-}" ]; then
     TRAIN_CMD="${TRAIN_CMD} data.train.TOFU_QA_full.args.max_length=${MAX_LENGTH}"
 fi
+
+if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
+    TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"
+fi
+
+# Clear GPU cache before training
+echo "Clearing GPU cache before training..."
+python -c "import torch; torch.cuda.empty_cache()" || true
 
 eval $TRAIN_CMD
 
@@ -141,8 +168,15 @@ if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
 
     TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
         --config-name=train \
-        experiment=finetune/tofu/default \
+        experiment=finetune/tofu/lora \
         model=${MODEL} \
+        +model.use_lora=true \
+        +model.lora_config.target_modules='[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\",\"lm_head\"]' \
+        +model.lora_config.lora_alpha=128 \
+        +model.lora_config.lora_dropout=0.05 \
+        +model.lora_config.r=128 \
+        +model.lora_config.bias=none \
+        +model.lora_config.task_type=CAUSAL_LM \
         task_name=${RETAIN_TASK_NAME} \
         data/datasets@data.train=TOFU_QA_retain \
         data.train.TOFU_QA_retain.args.hf_args.name=${RETAIN_SPLIT} \
@@ -153,6 +187,14 @@ if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
     if [ -n "${MAX_LENGTH:-}" ]; then
         TRAIN_CMD="${TRAIN_CMD} data.train.TOFU_QA_retain.args.max_length=${MAX_LENGTH}"
     fi
+
+    if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
+        TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"
+    fi
+
+    # Clear GPU cache before training
+    echo "Clearing GPU cache before training..."
+    python -c "import torch; torch.cuda.empty_cache()" || true
 
     eval $TRAIN_CMD
 
@@ -197,8 +239,15 @@ UNLEARN_TASK_NAME="tofu_${MODEL}_${FORGET_SPLIT}_${TRAINER}"
 
 TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=unlearn \
-    experiment=unlearn/tofu/default \
+    experiment=unlearn/tofu/lora \
     model=${MODEL} \
+    +model.use_lora=true \
+    +model.lora_config.target_modules='[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\",\"lm_head\"]' \
+    +model.lora_config.lora_alpha=128 \
+    +model.lora_config.lora_dropout=0.05 \
+    +model.lora_config.r=128 \
+    +model.lora_config.bias=none \
+    +model.lora_config.task_type=CAUSAL_LM \
     trainer=${TRAINER} \
     task_name=${UNLEARN_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
@@ -212,6 +261,14 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
 if [ -n "${MAX_LENGTH:-}" ]; then
     TRAIN_CMD="${TRAIN_CMD} data.forget.TOFU_QA_forget.args.max_length=${MAX_LENGTH} data.retain.TOFU_QA_retain.args.max_length=${MAX_LENGTH}"
 fi
+
+if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
+    TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"
+fi
+
+# Clear GPU cache before training
+echo "Clearing GPU cache before training..."
+python -c "import torch; torch.cuda.empty_cache()" || true
 
 eval $TRAIN_CMD
 

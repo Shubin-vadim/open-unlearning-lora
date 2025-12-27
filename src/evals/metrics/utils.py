@@ -35,7 +35,16 @@ def dict_transpose(evals):
 
 
 def aggregate_to_1D(x):
-    return np.mean(x, axis=tuple(range(1, x.ndim)))
+    if isinstance(x, torch.Tensor):
+        # If already 1D, return as is; otherwise aggregate along all dimensions except the first
+        if x.ndim <= 1:
+            return x
+        return torch.mean(x, dim=tuple(range(1, x.ndim)))
+    else:
+        # For numpy arrays, same logic
+        if x.ndim <= 1:
+            return x
+        return np.mean(x, axis=tuple(range(1, x.ndim)))
 
 
 def get_forget_quality(model_tr, reference_tr):

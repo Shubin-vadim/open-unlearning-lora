@@ -21,7 +21,8 @@ TRAINER="GradAscent"
 # Training parameters
 PER_DEVICE_TRAIN_BATCH_SIZE=4
 GRADIENT_ACCUMULATION_STEPS=4
-NUM_GPUS=1  # Change to 0,1 for multi-GPU training
+NUM_GPUS=1  # Number of GPUs to use
+GPU_IDS=0  # GPU device IDs (use 0 for single GPU, 0,1 for multi-GPU)
 
 # Set master port for distributed training
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
@@ -74,7 +75,7 @@ echo ""
 
 FULL_TASK_NAME="tofu_${MODEL}_full"
 
-CUDA_VISIBLE_DEVICES=$NUM_GPUS python src/train.py \
+CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=train \
     experiment=finetune/tofu/default \
     model=${MODEL} \
@@ -116,7 +117,7 @@ if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
     echo "      It's used as a reference for forget_quality metric evaluation."
     echo ""
 
-    CUDA_VISIBLE_DEVICES=$NUM_GPUS python src/train.py \
+    CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
         --config-name=train \
         experiment=finetune/tofu/default \
         model=${MODEL} \
@@ -165,7 +166,7 @@ echo "-------------------------------------------"
 
 UNLEARN_TASK_NAME="tofu_${MODEL}_${FORGET_SPLIT}_${TRAINER}"
 
-CUDA_VISIBLE_DEVICES=$NUM_GPUS python src/train.py \
+CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=unlearn \
     experiment=unlearn/tofu/default \
     model=${MODEL} \

@@ -19,10 +19,14 @@ HOLDOUT_SPLIT="holdout10"
 TRAINER="GradAscent"
 
 # Training parameters
-PER_DEVICE_TRAIN_BATCH_SIZE=4
-GRADIENT_ACCUMULATION_STEPS=4
+# Memory optimization: reduce batch size and increase gradient accumulation
+PER_DEVICE_TRAIN_BATCH_SIZE=2  # Reduced from 4 to save VRAM
+GRADIENT_ACCUMULATION_STEPS=8  # Increased from 4 to maintain effective batch size
 NUM_GPUS=1  # Number of GPUs to use
 GPU_IDS=0  # GPU device IDs (use 0 for single GPU, 0,1 for multi-GPU)
+
+# Additional memory-saving options (uncomment to enable if needed)
+# MAX_LENGTH=256  # Reduce sequence length (default: 512) - reduces VRAM significantly
 
 # Set master port for distributed training
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
@@ -36,7 +40,18 @@ echo "Forget Split: $FORGET_SPLIT"
 echo "Retain Split: $RETAIN_SPLIT"
 echo "Holdout Split: $HOLDOUT_SPLIT"
 echo "Trainer: $TRAINER"
+echo "Batch Size: $PER_DEVICE_TRAIN_BATCH_SIZE"
+echo "Gradient Accumulation: $GRADIENT_ACCUMULATION_STEPS"
+echo "Effective Batch Size: $((PER_DEVICE_TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS))"
+echo "Gradient Checkpointing: Enabled (saves VRAM)"
 echo "=========================================="
+echo ""
+echo "Memory Optimization Tips:"
+echo "- If you still run out of VRAM, try:"
+echo "  1. Reduce PER_DEVICE_TRAIN_BATCH_SIZE to 1"
+echo "  2. Increase GRADIENT_ACCUMULATION_STEPS to 16"
+echo "  3. Uncomment MAX_LENGTH=256 to reduce sequence length"
+echo "  4. Consider using LoRA (see configs/experiment/finetune/tofu/lora.yaml)"
 echo ""
 
 ########################################################################################################################
@@ -75,7 +90,7 @@ echo ""
 
 FULL_TASK_NAME="tofu_${MODEL}_full"
 
-CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
+TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=train \
     experiment=finetune/tofu/default \
     model=${MODEL} \
@@ -83,7 +98,14 @@ CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     data/datasets@data.train=TOFU_QA_full \
     data.train.TOFU_QA_full.args.hf_args.name=full \
     trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
-    trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS}
+    trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
+    trainer.args.gradient_checkpointing=True"
+
+if [ -n "${MAX_LENGTH:-}" ]; then
+    TRAIN_CMD="${TRAIN_CMD} data.train.TOFU_QA_full.args.max_length=${MAX_LENGTH}"
+fi
+
+eval $TRAIN_CMD
 
 echo "✓ Fine-tuning on full dataset completed"
 echo "Model saved to: saves/finetune/${FULL_TASK_NAME}"
@@ -117,7 +139,7 @@ if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
     echo "      It's used as a reference for forget_quality metric evaluation."
     echo ""
 
-    CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
+    TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
         --config-name=train \
         experiment=finetune/tofu/default \
         model=${MODEL} \
@@ -125,7 +147,14 @@ if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
         data/datasets@data.train=TOFU_QA_retain \
         data.train.TOFU_QA_retain.args.hf_args.name=${RETAIN_SPLIT} \
         trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
-        trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS}
+        trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
+        trainer.args.gradient_checkpointing=True"
+
+    if [ -n "${MAX_LENGTH:-}" ]; then
+        TRAIN_CMD="${TRAIN_CMD} data.train.TOFU_QA_retain.args.max_length=${MAX_LENGTH}"
+    fi
+
+    eval $TRAIN_CMD
 
     echo "✓ Retain model fine-tuning completed"
     echo "Model saved to: saves/finetune/${RETAIN_TASK_NAME}"
@@ -166,7 +195,7 @@ echo "-------------------------------------------"
 
 UNLEARN_TASK_NAME="tofu_${MODEL}_${FORGET_SPLIT}_${TRAINER}"
 
-CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
+TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=unlearn \
     experiment=unlearn/tofu/default \
     model=${MODEL} \
@@ -177,7 +206,14 @@ CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     model.model_args.pretrained_model_name_or_path=saves/finetune/${FULL_TASK_NAME} \
     retain_logs_path=saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json \
     trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
-    trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS}
+    trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
+    trainer.args.gradient_checkpointing=True"
+
+if [ -n "${MAX_LENGTH:-}" ]; then
+    TRAIN_CMD="${TRAIN_CMD} data.forget.TOFU_QA_forget.args.max_length=${MAX_LENGTH} data.retain.TOFU_QA_retain.args.max_length=${MAX_LENGTH}"
+fi
+
+eval $TRAIN_CMD
 
 echo "✓ Unlearning completed"
 echo "Unlearned model saved to: saves/unlearn/${UNLEARN_TASK_NAME}"

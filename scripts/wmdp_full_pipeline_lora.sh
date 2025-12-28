@@ -30,11 +30,12 @@ TRAINER="RMU"  # Default trainer for WMDP
 # For Zephyr/Mistral without LoRA: use "model.layers.7"
 # Adjust layer number based on model size (e.g., 7 for 7B models, 3-4 for smaller models)
 # If you get "No module matched" error, the improved error message will show available modules
-RMU_MODULE_REGEX="base_model\\.model\\.layers\\.7"  # For Qwen with PEFT LoRA (default)
+RMU_MODULE_REGEX="base_model\\.model\\.model\\.layers\\.7"  # For Qwen with PEFT LoRA (default - three model levels!)
 # Alternative options (uncomment one if default doesn't work):
+# RMU_MODULE_REGEX="base_model\\.model\\.layers\\.7"  # For PEFT with two model levels
 # RMU_MODULE_REGEX="model\\.model\\.layers\\.7"  # For custom LoRA wrapper
 # RMU_MODULE_REGEX="model\\.layers\\.7"  # For models without LoRA wrapper
-# RMU_MODULE_REGEX="base_model\\.model\\.layers\\.3"  # For smaller models, try lower layer numbers
+# RMU_MODULE_REGEX="base_model\\.model\\.model\\.layers\\.3"  # For smaller models, try lower layer numbers
 RMU_TRAINABLE_PARAMS_REGEX=".*"  # Update all parameters, or use specific regex like "base_model\\.model\\.layers\\.(5|6|7)\\.mlp\\.down_proj\\.weight"
 
 # Training parameters
@@ -166,16 +167,17 @@ echo "      Forget corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-forget-corpus.js
 echo "      Retain corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-retain-corpus.jsonl"
 echo ""
 echo "RMU Configuration:"
-echo "  Using default config: module_regex='base_model.model.layers.7' (for Qwen with PEFT LoRA)"
+echo "  Using default config: module_regex='base_model.model.model.layers.7' (for Qwen with PEFT LoRA)"
+echo "  Note: Qwen with PEFT LoRA has THREE 'model' levels: base_model.model.model.layers.X"
 echo "  If you get 'No module matched' error:"
 echo "    - The error message will show available layer modules"
 echo "    - You can override in the script by uncommenting RMU_MODULE_REGEX override lines"
 echo "    - Or edit configs/experiment/unlearn/wmdp/lora.yaml"
 echo "  Common patterns:"
-echo "    - For Qwen with PEFT LoRA: 'base_model.model.layers.7' (default)"
-echo "    - For Qwen with custom LoRA: 'model.model.layers.7'"
+echo "    - For Qwen with PEFT LoRA: 'base_model.model.model.layers.7' (default - three model levels)"
+echo "    - For PEFT with two levels: 'base_model.model.layers.7'"
 echo "    - For Zephyr/Mistral: 'model.layers.7'"
-echo "    - For smaller models: try lower layer numbers (e.g., 'base_model.model.layers.3')"
+echo "    - For smaller models: try lower layer numbers (e.g., 'base_model.model.model.layers.3')"
 echo ""
 
 UNLEARN_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_${TRAINER}"

@@ -65,7 +65,7 @@ trainer:
     steering_coeff: 2
     retain_loss_type: EMBED_DIFF
     alpha: 1
-    module_regex: base_model\.model\.layers\.7  # Default for Qwen with PEFT LoRA
+    module_regex: base_model\.model\.model\.layers\.7  # Default for Qwen with PEFT LoRA (three model levels)
     trainable_params_regex: 
       - .*  # Update all parameters (default for LoRA)
       # - base_model\.model\.layers\.(5|6|7)\.mlp\.down_proj\.weight # Alternative: update only specific weights

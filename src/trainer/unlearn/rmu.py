@@ -11,8 +11,8 @@ logger = get_logger(__name__)
 class RMU(GradDiff):
     def __init__(
         self,
-        module_regex="model\.layers\.7",
-        trainable_params_regex=["model\.layers\.(5|6|7)\.mlp\.down_proj\.weight"],
+        module_regex=r"model\.layers\.7",
+        trainable_params_regex=[r"model\.layers\.(5|6|7)\.mlp\.down_proj\.weight"],
         steering_coeff=20,
         *args,
         **kwargs,
@@ -85,11 +85,13 @@ class RMU(GradDiff):
             
             # Generate alternative patterns based on common PEFT structures
             # Patterns already have escaped dots for regex
+            # Note: For Qwen with PEFT LoRA, structure is: base_model.model.model.layers.X (three model levels!)
             alternative_patterns = [
-                f'base_model\\.model\\.layers\\.{layer_num}',  # PEFT standard
-                f'model\\.model\\.layers\\.{layer_num}',      # Custom wrapper
-                f'model\\.layers\\.{layer_num}',              # Direct access
-                f'base_model\\.layers\\.{layer_num}',         # Alternative PEFT
+                f'base_model\\.model\\.model\\.layers\\.{layer_num}',  # PEFT with Qwen (three model levels)
+                f'base_model\\.model\\.layers\\.{layer_num}',          # PEFT standard (two model levels)
+                f'model\\.model\\.layers\\.{layer_num}',              # Custom wrapper
+                f'model\\.layers\\.{layer_num}',                      # Direct access
+                f'base_model\\.layers\\.{layer_num}',                 # Alternative PEFT
             ]
             
             # Try each alternative pattern

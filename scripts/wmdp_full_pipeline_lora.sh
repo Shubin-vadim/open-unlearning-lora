@@ -24,6 +24,18 @@ MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA fo
 DATA_SPLIT="cyber"  # Options: cyber, bio
 TRAINER="RMU"  # Default trainer for WMDP
 
+# RMU-specific configuration (adjust based on model architecture)
+# For Qwen models with LoRA: try "model.model.layers.7" (LoRA wrapper adds extra "model" level)
+# For Qwen models without LoRA: use "model.layers.7"
+# For Zephyr/Mistral: use "model.layers.7"
+# Adjust layer number based on model size (e.g., 7 for 7B models, 3-4 for smaller models)
+# If you get "No module matched" error, try the alternative regex patterns below
+RMU_MODULE_REGEX="model\\.model\\.layers\\.7"  # For Qwen with LoRA wrapper (default)
+# Alternative options (uncomment one if default doesn't work):
+# RMU_MODULE_REGEX="model\\.layers\\.7"  # For models without LoRA wrapper
+# RMU_MODULE_REGEX="model\\.model\\.layers\\.3"  # For smaller models, try lower layer numbers
+RMU_TRAINABLE_PARAMS_REGEX=".*"  # Update all parameters, or use specific regex like "model\\.model\\.layers\\.(5|6|7)\\.mlp\\.down_proj\\.weight"
+
 # Training parameters
 # Memory optimization: reduce batch size and increase gradient accumulation
 PER_DEVICE_TRAIN_BATCH_SIZE=1  # Reduced to 1 to save VRAM (minimum batch size)
@@ -152,6 +164,16 @@ echo "Note: WMDP unlearning uses forget and retain corpora"
 echo "      Forget corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-forget-corpus.jsonl"
 echo "      Retain corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-retain-corpus.jsonl"
 echo ""
+echo "RMU Configuration:"
+echo "  Using default config: module_regex='model.model.layers.7' (for Qwen with LoRA)"
+echo "  If you get 'No module matched' error, you can override in the script:"
+echo "    - Uncomment RMU_MODULE_REGEX override lines in TRAIN_CMD"
+echo "    - Or edit configs/experiment/unlearn/wmdp/lora.yaml"
+echo "  Alternative patterns:"
+echo "    - For Qwen with LoRA: 'model.model.layers.7' (default) or 'model.layers.7'"
+echo "    - For Zephyr/Mistral: 'model.layers.7'"
+echo "    - For smaller models: try lower layer numbers (e.g., 'model.model.layers.3')"
+echo ""
 
 UNLEARN_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_${TRAINER}"
 
@@ -173,6 +195,10 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
     trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
     trainer.args.gradient_checkpointing=True"
+
+# Override RMU module_regex if custom value is set (uncomment to use custom regex)
+# TRAIN_CMD="${TRAIN_CMD} trainer.method_args.module_regex='${RMU_MODULE_REGEX}'"
+# TRAIN_CMD="${TRAIN_CMD} trainer.method_args.trainable_params_regex='[\"${RMU_TRAINABLE_PARAMS_REGEX}\"]'"
 
 if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
     TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"

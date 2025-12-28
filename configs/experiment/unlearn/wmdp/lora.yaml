@@ -55,12 +55,17 @@ trainer:
 
   method_args:
     # The params here are more dependent on model and dataset. Tune them carefully to work
+    # NOTE: module_regex depends on model architecture:
+    # - For Qwen with LoRA: use "model.model.layers.7" (LoRA wrapper adds extra "model" level)
+    # - For Qwen without LoRA or Zephyr/Mistral: use "model.layers.7"
+    # - Adjust layer number based on model size (e.g., 7 for 7B models, 3-4 for smaller models)
     gamma: 1.0
     steering_coeff: 2
     retain_loss_type: EMBED_DIFF
     alpha: 1
-    module_regex: model\.layers\.7
+    module_regex: model\.model\.layers\.7  # Default for Qwen with LoRA, adjust if needed
     trainable_params_regex: 
-      - model\.layers\.(5|6|7)\.mlp\.down_proj\.weight # If you want to update only these weights (as done in https://github.com/centerforaisafety/wmdp/blob/bc5e1ba0367ea826caeeeaa50656336a1e87acfb/rmu/unlearn.py#L26)
+      - .*  # Update all parameters (default for LoRA)
+      # - model\.model\.layers\.(5|6|7)\.mlp\.down_proj\.weight # Alternative: update only specific weights
 
 task_name: wmdp_unlearn_lora

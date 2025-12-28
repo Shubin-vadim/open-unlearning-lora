@@ -1,22 +1,23 @@
 #!/bin/bash
 
-# Full Pipeline Script for Qwen2.5-3B-Instruct
+# Full Pipeline Script for TOFU Benchmark with LoRA
 # This script demonstrates a complete workflow:
 # 0. Evaluating original model (baseline)
 # 1. Fine-tuning on TOFU full dataset
 # 2. Fine-tuning retain model
 # 3. Evaluating retain model
-# 4. Unlearning using GradAscent
+# 4. Unlearning using specified trainer
 # 5. Evaluating unlearned model
 
 set -e  # Exit on error
 
 # Configuration
-MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA for training
-FORGET_SPLIT="forget10"
-RETAIN_SPLIT="retain90"
-HOLDOUT_SPLIT="holdout10"
-TRAINER="GradAscent"
+MODEL="Qwen2.5-3B-Instruct"  # Model name (used for config selection), will use LoRA for training
+MODEL_BASE_PATH="Qwen/Qwen2.5-3B-Instruct"  # HuggingFace model path or local path to base model
+FORGET_SPLIT="forget10"  # Options: forget10, forget5, forget1
+RETAIN_SPLIT="retain90"  # Options: retain90, retain95, retain99
+HOLDOUT_SPLIT="holdout10"  # Options: holdout10, holdout5, holdout1
+TRAINER="GradAscent"  # Unlearning method: GradAscent, GradDiff, NPO, SimNPO, DPO, RMU, etc.
 
 # Training parameters
 # Memory optimization: reduce batch size and increase gradient accumulation
@@ -37,7 +38,7 @@ echo "Master Port: $MASTER_PORT"
 export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 echo "=========================================="
-echo "Qwen2.5-3B-Instruct Full Pipeline (LoRA)"
+echo "TOFU Full Pipeline (LoRA)"
 echo "=========================================="
 echo "Model: $MODEL"
 echo "Forget Split: $FORGET_SPLIT"
@@ -82,7 +83,7 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     task_name=${ORIGINAL_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
     holdout_split=${HOLDOUT_SPLIT} \
-    model.model_args.pretrained_model_name_or_path=Qwen/Qwen2.5-3B-Instruct
+    model.model_args.pretrained_model_name_or_path=${MODEL_BASE_PATH}
 
 echo "✓ Original model evaluation completed"
 echo "Evaluation results saved to: saves/eval/${ORIGINAL_TASK_NAME}/TOFU_EVAL.json"

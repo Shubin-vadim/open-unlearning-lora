@@ -297,7 +297,7 @@ The above scripts are not tuned and uses default hyper parameter settings. We en
 
 **TOFU Benchmark:**
 ```bash
-bash scripts/qwen3b_full_pipeline.sh
+bash scripts/tofu_full_pipeline_lora.sh
 ```
 
 **MUSE Benchmark:**
@@ -369,7 +369,7 @@ For complete end-to-end workflows with LoRA, use the dedicated pipeline scripts:
 
 **TOFU Full Pipeline:**
 ```bash
-bash scripts/qwen3b_full_pipeline.sh
+bash scripts/tofu_full_pipeline_lora.sh
 ```
 This script runs the complete TOFU workflow: baseline evaluation → fine-tuning on full dataset → fine-tuning retain model → retain evaluation → unlearning → unlearned evaluation.
 

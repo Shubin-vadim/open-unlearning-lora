@@ -28,15 +28,39 @@ class LMEvalEvaluator(Evaluator):
         
         # Handle PEFT/LoRA models - merge LoRA weights into base model for lm_eval
         # PEFT models can cause issues with tie_weights() in HFLM
-        if isinstance(model, PeftModel):
-            logger.info("Detected PEFT model, merging LoRA weights for lm_eval")
+        # Check if model is a PeftModel or has PEFT attributes
+        is_peft = isinstance(model, PeftModel) or hasattr(model, 'peft_config') or hasattr(model, 'get_base_model')
+        
+        if is_peft:
+            logger.info("Detected PEFT/LoRA model, merging LoRA weights for lm_eval")
             # Merge LoRA weights into base model to avoid tie_weights issues
             # This creates a full model with LoRA weights merged
-            merged_model = model.merge_and_unload()
+            if isinstance(model, PeftModel):
+                merged_model = model.merge_and_unload()
+            else:
+                # If it's not a PeftModel but has PEFT attributes, try to get base model
+                merged_model = model.get_base_model() if hasattr(model, 'get_base_model') else model
             merged_model.eval()
-            return HFLM(merged_model)
+        else:
+            merged_model = model
         
-        return HFLM(model)
+        # Disable tie_weights to avoid KeyError with merged LoRA models
+        # Monkey-patch tie_weights to be a no-op before passing to HFLM
+        original_tie_weights = getattr(merged_model, 'tie_weights', None)
+        if original_tie_weights:
+            def noop_tie_weights():
+                """No-op replacement for tie_weights to avoid conflicts with merged LoRA models"""
+                pass
+            merged_model.tie_weights = noop_tie_weights
+            logger.debug("Disabled tie_weights() to avoid conflicts with merged LoRA model")
+        
+        # Create HFLM wrapper - it will try to call tie_weights, but our no-op will handle it
+        hflm_model = HFLM(merged_model)
+        
+        # Restore original tie_weights if we patched it (optional, for cleanup)
+        # Note: HFLM already called tie_weights in __init__, so restoring is optional
+        
+        return hflm_model
 
     def summarize(self, eval_results: dict, task_name: str) -> dict:
         """

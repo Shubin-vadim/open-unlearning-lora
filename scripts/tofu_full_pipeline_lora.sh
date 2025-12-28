@@ -11,6 +11,11 @@
 
 set -e  # Exit on error
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # Configuration
 MODEL="Qwen2.5-3B-Instruct"  # Model name (used for config selection), will use LoRA for training
 MODEL_BASE_PATH="Qwen/Qwen2.5-3B-Instruct"  # HuggingFace model path or local path to base model
@@ -66,6 +71,86 @@ echo "- Trains only ~1% of model parameters (LoRA adapters)"
 echo "- Significantly reduced memory usage"
 echo "- Faster training and smaller checkpoints"
 echo ""
+
+########################################################################################################################
+########################################### Data Setup Check ##########################################################
+########################################################################################################################
+
+echo "Checking TOFU evaluation data availability..."
+echo "-------------------------------------------"
+
+# Check if eval logs directory exists and has content
+EVAL_LOGS_DIR="saves/eval"
+EVAL_LOGS_CHECK=false
+
+# Check for some common TOFU eval log files
+if [ -d "$EVAL_LOGS_DIR" ] && [ "$(ls -A $EVAL_LOGS_DIR 2>/dev/null)" ]; then
+    # Check if there are any TOFU eval files
+    if find "$EVAL_LOGS_DIR" -name "*TOFU*" -o -name "*tofu*" 2>/dev/null | grep -q .; then
+        EVAL_LOGS_CHECK=true
+    fi
+fi
+
+if [ "$EVAL_LOGS_CHECK" = false ]; then
+    echo "⚠️  TOFU evaluation logs not found!"
+    echo "   Evaluation logs are needed for proper evaluation metrics."
+    echo ""
+    echo "Downloading evaluation logs..."
+    echo "This will download eval logs for TOFU, MUSE retain and finetuned models."
+    echo ""
+    
+    # Check if setup_data.py exists
+    if [ ! -f "setup_data.py" ]; then
+        echo "❌ Error: setup_data.py not found. Please run this script from the project root directory."
+        exit 1
+    fi
+    
+    # Download eval logs
+    python setup_data.py --eval_logs
+    
+    # Verify download
+    if [ ! -d "$EVAL_LOGS_DIR" ] || [ -z "$(ls -A $EVAL_LOGS_DIR 2>/dev/null)" ]; then
+        echo "⚠️  Warning: Evaluation logs may not have been downloaded successfully."
+        echo "   You can manually run: python setup_data.py --eval_logs"
+        echo "   The pipeline will continue, but some evaluation metrics may not work correctly."
+    else
+        echo "✓ Evaluation logs downloaded successfully"
+    fi
+else
+    echo "✓ Evaluation logs found"
+fi
+
+echo ""
+echo "Note: TOFU dataset will be automatically downloaded from HuggingFace when needed."
+echo ""
+
+# Check for IDK data (optional, only needed for IDK experiments)
+IDK_FILE="data/idk.jsonl"
+if [ ! -f "$IDK_FILE" ]; then
+    echo "ℹ️  IDK data file not found: $IDK_FILE"
+    echo "   IDK data is optional and only needed for experiments using TOFU_QA_forget_idk dataset."
+    echo "   Downloading IDK dataset automatically..."
+    echo ""
+    
+    # Check if setup_data.py exists
+    if [ ! -f "setup_data.py" ]; then
+        echo "⚠️  Warning: setup_data.py not found. Skipping IDK data download."
+        echo "   You can manually run: python setup_data.py --idk"
+    else
+        # Download IDK data
+        python setup_data.py --idk
+        
+        # Verify download
+        if [ ! -f "$IDK_FILE" ]; then
+            echo "⚠️  Warning: IDK data may not have been downloaded successfully."
+            echo "   You can manually run: python setup_data.py --idk"
+            echo "   The pipeline will continue without IDK data (only needed for IDK experiments)."
+        else
+            echo "✓ IDK data downloaded successfully"
+        fi
+    fi
+    echo ""
+fi
 
 ########################################################################################################################
 ########################################### Step 0: Evaluate Original Model ###########################################

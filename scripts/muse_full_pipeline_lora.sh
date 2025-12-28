@@ -11,6 +11,11 @@
 
 set -e  # Exit on error
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # Configuration
 MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA for training
 DATA_SPLIT="News"  # Options: News, Books
@@ -64,6 +69,58 @@ echo "- Uses original model from HuggingFace"
 echo "- Trains only ~1% of model parameters (LoRA adapters)"
 echo "- Significantly reduced memory usage"
 echo "- Faster training and smaller checkpoints"
+echo ""
+
+########################################################################################################################
+########################################### Data Setup Check ##########################################################
+########################################################################################################################
+
+echo "Checking MUSE evaluation data availability..."
+echo "-------------------------------------------"
+
+# Check if eval logs directory exists and has content
+EVAL_LOGS_DIR="saves/eval"
+EVAL_LOGS_CHECK=false
+
+# Check for some common MUSE eval log files
+if [ -d "$EVAL_LOGS_DIR" ] && [ "$(ls -A $EVAL_LOGS_DIR 2>/dev/null)" ]; then
+    # Check if there are any MUSE eval files
+    if find "$EVAL_LOGS_DIR" -name "*MUSE*" -o -name "*muse*" 2>/dev/null | grep -q .; then
+        EVAL_LOGS_CHECK=true
+    fi
+fi
+
+if [ "$EVAL_LOGS_CHECK" = false ]; then
+    echo "⚠️  MUSE evaluation logs not found!"
+    echo "   Evaluation logs are needed for proper evaluation metrics."
+    echo ""
+    echo "Downloading evaluation logs..."
+    echo "This will download eval logs for TOFU, MUSE retain and finetuned models."
+    echo ""
+    
+    # Check if setup_data.py exists
+    if [ ! -f "setup_data.py" ]; then
+        echo "❌ Error: setup_data.py not found. Please run this script from the project root directory."
+        exit 1
+    fi
+    
+    # Download eval logs
+    python setup_data.py --eval_logs
+    
+    # Verify download
+    if [ ! -d "$EVAL_LOGS_DIR" ] || [ -z "$(ls -A $EVAL_LOGS_DIR 2>/dev/null)" ]; then
+        echo "⚠️  Warning: Evaluation logs may not have been downloaded successfully."
+        echo "   You can manually run: python setup_data.py --eval_logs"
+        echo "   The pipeline will continue, but some evaluation metrics may not work correctly."
+    else
+        echo "✓ Evaluation logs downloaded successfully"
+    fi
+else
+    echo "✓ Evaluation logs found"
+fi
+
+echo ""
+echo "Note: MUSE dataset will be automatically downloaded from HuggingFace when needed."
 echo ""
 
 ########################################################################################################################

@@ -11,6 +11,11 @@
 
 set -e  # Exit on error
 
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$PROJECT_ROOT"
+
 # Configuration
 MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA for training
 # NOTE: WMDP default uses zephyr-7b-beta, but this script uses Qwen2.5-3B-Instruct with LoRA
@@ -64,6 +69,50 @@ echo "- Faster training and smaller checkpoints"
 echo ""
 echo "NOTE: WMDP typically uses pre-trained models. If you have a pre-trained model,"
 echo "      you can set BASE_MODEL_PATH to skip the baseline evaluation."
+echo ""
+
+########################################################################################################################
+########################################### Data Setup Check ##########################################################
+########################################################################################################################
+
+echo "Checking WMDP data availability..."
+echo "-------------------------------------------"
+
+WMDP_DATA_DIR="data/wmdp/wmdp-corpora"
+FORGET_FILE="${WMDP_DATA_DIR}/${DATA_SPLIT}-forget-corpus.jsonl"
+RETAIN_FILE="${WMDP_DATA_DIR}/${DATA_SPLIT}-retain-corpus.jsonl"
+
+if [ ! -f "$FORGET_FILE" ] || [ ! -f "$RETAIN_FILE" ]; then
+    echo "⚠️  WMDP data files not found!"
+    echo "   Missing: $FORGET_FILE or $RETAIN_FILE"
+    echo ""
+    echo "Downloading WMDP dataset..."
+    echo "This will download and extract the WMDP corpora."
+    echo ""
+    
+    # Check if setup_data.py exists
+    if [ ! -f "setup_data.py" ]; then
+        echo "❌ Error: setup_data.py not found. Please run this script from the project root directory."
+        exit 1
+    fi
+    
+    # Download WMDP data
+    python setup_data.py --wmdp
+    
+    # Verify download
+    if [ ! -f "$FORGET_FILE" ] || [ ! -f "$RETAIN_FILE" ]; then
+        echo "❌ Error: Failed to download WMDP data files."
+        echo "   Please manually run: python setup_data.py --wmdp"
+        echo "   Or download from: https://cais-wmdp.s3.us-west-1.amazonaws.com/wmdp-corpora.zip"
+        echo "   Password: wmdpcorpora"
+        exit 1
+    fi
+    
+    echo "✓ WMDP data downloaded successfully"
+else
+    echo "✓ WMDP data files found"
+fi
+
 echo ""
 
 ########################################################################################################################

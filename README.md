@@ -231,7 +231,18 @@ set HF_HOME=~/.cache/huggingface  # Optional
 python setup_data.py --eval # saves/eval now contains evaluation results of the uploaded models
 # This downloads log files with evaluation results (including retain model logs)
 # into `saves/eval`, used for evaluating unlearning across supported benchmarks.
-# Additional datasets (e.g., WMDP) are supported — run below for options:
+
+# For WMDP benchmark, download the corpora:
+python setup_data.py --wmdp
+# This downloads and extracts WMDP corpora into data/wmdp/wmdp-corpora/
+
+# Note: The pipeline scripts (tofu_full_pipeline_lora.sh, muse_full_pipeline_lora.sh, wmdp_full_pipeline_lora.sh)
+# will automatically check and download required data if missing:
+# - TOFU/MUSE: Evaluation logs (via --eval_logs flag)
+# - WMDP: Corpora files (via --wmdp flag)
+# - Datasets from HuggingFace (TOFU, MUSE) are downloaded automatically when needed
+
+# Additional datasets (e.g., IDK) are supported — run below for options:
 # python setup_data.py --help
 ```
 

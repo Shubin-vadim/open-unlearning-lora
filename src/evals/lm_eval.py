@@ -1,5 +1,6 @@
 import logging
 from omegaconf import OmegaConf
+from peft import PeftModel
 
 from lm_eval.models.hf_vlms import HFLM
 from lm_eval.tasks import TaskManager
@@ -24,6 +25,17 @@ class LMEvalEvaluator(Evaluator):
     def prepare_model(self, model, **kwargs):
         """Prepare model for evaluation"""
         model.eval()
+        
+        # Handle PEFT/LoRA models - merge LoRA weights into base model for lm_eval
+        # PEFT models can cause issues with tie_weights() in HFLM
+        if isinstance(model, PeftModel):
+            logger.info("Detected PEFT model, merging LoRA weights for lm_eval")
+            # Merge LoRA weights into base model to avoid tie_weights issues
+            # This creates a full model with LoRA weights merged
+            merged_model = model.merge_and_unload()
+            merged_model.eval()
+            return HFLM(merged_model)
+        
         return HFLM(model)
 
     def summarize(self, eval_results: dict, task_name: str) -> dict:

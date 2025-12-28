@@ -25,16 +25,17 @@ DATA_SPLIT="cyber"  # Options: cyber, bio
 TRAINER="RMU"  # Default trainer for WMDP
 
 # RMU-specific configuration (adjust based on model architecture)
-# For Qwen models with LoRA: try "model.model.layers.7" (LoRA wrapper adds extra "model" level)
-# For Qwen models without LoRA: use "model.layers.7"
-# For Zephyr/Mistral: use "model.layers.7"
+# For Qwen with PEFT LoRA: use "base_model.model.layers.7" (PEFT wraps base_model)
+# For Qwen with custom LoRA wrapper: try "model.model.layers.7"
+# For Zephyr/Mistral without LoRA: use "model.layers.7"
 # Adjust layer number based on model size (e.g., 7 for 7B models, 3-4 for smaller models)
-# If you get "No module matched" error, try the alternative regex patterns below
-RMU_MODULE_REGEX="model\\.model\\.layers\\.7"  # For Qwen with LoRA wrapper (default)
+# If you get "No module matched" error, the improved error message will show available modules
+RMU_MODULE_REGEX="base_model\\.model\\.layers\\.7"  # For Qwen with PEFT LoRA (default)
 # Alternative options (uncomment one if default doesn't work):
+# RMU_MODULE_REGEX="model\\.model\\.layers\\.7"  # For custom LoRA wrapper
 # RMU_MODULE_REGEX="model\\.layers\\.7"  # For models without LoRA wrapper
-# RMU_MODULE_REGEX="model\\.model\\.layers\\.3"  # For smaller models, try lower layer numbers
-RMU_TRAINABLE_PARAMS_REGEX=".*"  # Update all parameters, or use specific regex like "model\\.model\\.layers\\.(5|6|7)\\.mlp\\.down_proj\\.weight"
+# RMU_MODULE_REGEX="base_model\\.model\\.layers\\.3"  # For smaller models, try lower layer numbers
+RMU_TRAINABLE_PARAMS_REGEX=".*"  # Update all parameters, or use specific regex like "base_model\\.model\\.layers\\.(5|6|7)\\.mlp\\.down_proj\\.weight"
 
 # Training parameters
 # Memory optimization: reduce batch size and increase gradient accumulation
@@ -165,14 +166,16 @@ echo "      Forget corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-forget-corpus.js
 echo "      Retain corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-retain-corpus.jsonl"
 echo ""
 echo "RMU Configuration:"
-echo "  Using default config: module_regex='model.model.layers.7' (for Qwen with LoRA)"
-echo "  If you get 'No module matched' error, you can override in the script:"
-echo "    - Uncomment RMU_MODULE_REGEX override lines in TRAIN_CMD"
+echo "  Using default config: module_regex='base_model.model.layers.7' (for Qwen with PEFT LoRA)"
+echo "  If you get 'No module matched' error:"
+echo "    - The error message will show available layer modules"
+echo "    - You can override in the script by uncommenting RMU_MODULE_REGEX override lines"
 echo "    - Or edit configs/experiment/unlearn/wmdp/lora.yaml"
-echo "  Alternative patterns:"
-echo "    - For Qwen with LoRA: 'model.model.layers.7' (default) or 'model.layers.7'"
+echo "  Common patterns:"
+echo "    - For Qwen with PEFT LoRA: 'base_model.model.layers.7' (default)"
+echo "    - For Qwen with custom LoRA: 'model.model.layers.7'"
 echo "    - For Zephyr/Mistral: 'model.layers.7'"
-echo "    - For smaller models: try lower layer numbers (e.g., 'model.model.layers.3')"
+echo "    - For smaller models: try lower layer numbers (e.g., 'base_model.model.layers.3')"
 echo ""
 
 UNLEARN_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_${TRAINER}"

@@ -3,6 +3,9 @@
 import re
 import torch
 from trainer.unlearn.grad_diff import GradDiff
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class RMU(GradDiff):
@@ -52,6 +55,7 @@ class RMU(GradDiff):
         if hasattr(model, 'module'):
             model = model.module  # Extract the actual PyTorch model inside
 
+        # First, try the provided regex
         matched_modules = {
             name: module
             for name, module in model.named_modules()
@@ -63,7 +67,59 @@ class RMU(GradDiff):
                 f"More than one module matched with {module_regex}: {list(matched_modules.keys())}"
             )
         elif not matched_modules:
-            raise ValueError(f"No module matched with {module_regex}")
+            # Get all module names for debugging
+            all_module_names = [name for name, _ in model.named_modules()]
+            
+            # Find all layer-related modules
+            layer_patterns = [
+                name for name in all_module_names 
+                if 'layer' in name.lower() and any(char.isdigit() for char in name)
+            ]
+            
+            # Try common alternatives for PEFT/LoRA models automatically
+            alternative_patterns = []
+            
+            # Extract layer number from original regex if possible
+            layer_match = re.search(r'\.(\d+)$', module_regex)
+            layer_num = layer_match.group(1) if layer_match else '7'
+            
+            # Generate alternative patterns based on common PEFT structures
+            # Patterns already have escaped dots for regex
+            alternative_patterns = [
+                f'base_model\\.model\\.layers\\.{layer_num}',  # PEFT standard
+                f'model\\.model\\.layers\\.{layer_num}',      # Custom wrapper
+                f'model\\.layers\\.{layer_num}',              # Direct access
+                f'base_model\\.layers\\.{layer_num}',         # Alternative PEFT
+            ]
+            
+            # Try each alternative pattern
+            for alt_pattern in alternative_patterns:
+                alt_matched = {
+                    name: module
+                    for name, module in model.named_modules()
+                    if re.fullmatch(alt_pattern, name)
+                }
+                if alt_matched:
+                    # Found a match! Use this pattern instead
+                    logger.warning(
+                        f"Module regex '{module_regex}' didn't match, but found match with '{alt_pattern}'. "
+                        f"Using alternative pattern."
+                    )
+                    return next(iter(alt_matched.values()))
+            
+            # If no alternatives worked, provide detailed error message
+            error_msg = f"No module matched with {module_regex}\n\n"
+            error_msg += f"Tried alternative patterns: {alternative_patterns}\n\n"
+            error_msg += f"Available layer modules (showing all matching 'layer' with numbers):\n"
+            for name in sorted(layer_patterns):
+                error_msg += f"  - {name}\n"
+            
+            if not layer_patterns:
+                error_msg += "\nNo layer modules found. Showing first 30 module names:\n"
+                for name in all_module_names[:30]:
+                    error_msg += f"  - {name}\n"
+            
+            raise ValueError(error_msg)
 
         return next(iter(matched_modules.values()))  # Return the single matched module
 

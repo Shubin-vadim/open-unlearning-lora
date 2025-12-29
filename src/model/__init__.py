@@ -10,6 +10,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 
 from model.lora import LoRAModelForCausalLM, get_lora_model
 from model.probe import ProbedLlamaForCausalLM
+from utils.logging import get_logger
 
 # Load .env file from project root
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -17,7 +18,7 @@ load_dotenv(env_path)
 
 hf_home = os.getenv("HF_HOME", default=None)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 MODEL_REGISTRY: Dict[str, Any] = {}
 
@@ -64,6 +65,7 @@ def get_model(model_cfg: DictConfig):
     # Check if LoRA is enabled
     use_lora = model_cfg.get("use_lora", False)
     if use_lora:
+        logger.info("LoRA enabled, loading LoRA model")
         return get_lora_model(model_cfg)
 
     # Original model loading logic
@@ -71,31 +73,46 @@ def get_model(model_cfg: DictConfig):
     tokenizer_args = model_cfg.tokenizer_args
     torch_dtype = get_dtype(model_args)
     model_handler = model_cfg.get("model_handler", "AutoModelForCausalLM")
+    logger.info(f"Loading model with handler: {model_handler}")
     model_cls = MODEL_REGISTRY[model_handler]
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
+        # Use device_map from config or default to "auto" for GPU
+        device_map = model_args.pop("device_map", "auto")
+    
+    logger.info(f"Model path: {model_path}")
+    logger.debug(f"Model args: {model_args}")
+    logger.debug(f"Tokenizer args: {tokenizer_args}")
+    logger.debug(f"Torch dtype: {torch_dtype}")
     
     # Get HuggingFace token from .env or environment variables
     hf_token = get_hf_token()
     if hf_token:
         # Add token to model_args if not already present
         if "token" not in model_args:
-            model_args["token"] = hf_token
+            with open_dict(model_args):
+                model_args["token"] = hf_token
+            logger.debug("Added HF token to model_args")
     
     try:
+        logger.info(f"Loading model from {model_path}...")
         model = model_cls.from_pretrained(
             pretrained_model_name_or_path=model_path,
             torch_dtype=torch_dtype,
-            device_map="auto",
+            device_map=device_map,
             **model_args,
             cache_dir=hf_home,
         )
+        logger.info(f"Model loaded successfully. Model type: {type(model).__name__}")
+        logger.debug(f"Model config: {model.config if hasattr(model, 'config') else 'N/A'}")
     except Exception as e:
-        logger.warning(f"Model {model_path} requested with {model_cfg.model_args}")
+        logger.error(f"Error loading model {model_path} with args {model_cfg.model_args}: {e}")
         raise ValueError(
             f"Error {e} while fetching model using {model_handler}.from_pretrained()."
         )
+    logger.info("Loading tokenizer...")
     tokenizer = get_tokenizer(tokenizer_args)
+    logger.info(f"Tokenizer loaded successfully. Vocab size: {len(tokenizer)}")
     return model, tokenizer
 
 
@@ -118,17 +135,22 @@ def get_tokenizer(tokenizer_cfg: DictConfig):
     tokenizer_kwargs = dict(tokenizer_cfg)
     if hf_token and "token" not in tokenizer_kwargs:
         tokenizer_kwargs["token"] = hf_token
+        logger.debug("Added HF token to tokenizer_kwargs")
     
+    tokenizer_path = tokenizer_cfg.get('pretrained_model_name_or_path', None)
+    logger.debug(f"Loading tokenizer from: {tokenizer_path}")
     try:
         tokenizer = AutoTokenizer.from_pretrained(**tokenizer_kwargs, cache_dir=hf_home)
+        logger.debug(f"Tokenizer loaded. Vocab size: {len(tokenizer)}")
     except Exception as e:
         error_message = (
             f"{'--' * 40}\n"
             f"Error {e} fetching tokenizer using AutoTokenizer.\n"
-            f"Tokenizer requested from path: {tokenizer_cfg.get('pretrained_model_name_or_path', None)}\n"
+            f"Tokenizer requested from path: {tokenizer_path}\n"
             f"Full tokenizer config: {tokenizer_cfg}\n"
             f"{'--' * 40}"
         )
+        logger.error(error_message)
         raise RuntimeError(error_message)
 
     if tokenizer.eos_token_id is None:

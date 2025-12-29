@@ -12,7 +12,7 @@ args:
   report_to: tensorboard
   ddp_find_unused_parameters: None
   gradient_checkpointing: False
-  optim: paged_adamw_32bit
+  optim: adamw_torch
   save_strategy: 'no'
   save_only_model: True
   weight_decay: 0.00

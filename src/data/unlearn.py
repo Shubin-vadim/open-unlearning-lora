@@ -1,5 +1,8 @@
 import torch
 from torch.utils.data import Dataset
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class ForgetRetainDataset(Dataset):
@@ -15,6 +18,9 @@ class ForgetRetainDataset(Dataset):
         self.forget = forget
         self.retain = retain
         self.anchor = anchor
+        forget_size = len(forget) if forget is not None else 0
+        retain_size = len(retain) if retain is not None else 0
+        logger.info(f"Initialized ForgetRetainDataset with anchor='{anchor}': forget={forget_size} samples, retain={retain_size} samples")
 
     def __len__(self):
         """Ensures the sampled dataset matches the anchor dataset's length."""

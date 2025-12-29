@@ -1,9 +1,11 @@
 import os
 import json
 import logging
+import numpy as np
 from evals.metrics import get_metrics
+from utils.logging import get_logger
 
-logger = logging.getLogger("evaluator")
+logger = get_logger("evaluator")
 
 
 class Evaluator:
@@ -25,14 +27,47 @@ class Evaluator:
         """Returns the cache of existing results"""
         logs = {}
         if os.path.exists(file):
-            logger.info(f"Loading existing evaluations from {file}")
-            with open(file, "r") as f:
-                logs = json.load(f)
+            try:
+                logger.info(f"Loading existing evaluations from {file}")
+                with open(file, "r") as f:
+                    logs = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.warning(
+                    f"Failed to parse JSON file {file}: {e}. "
+                    "The file may be corrupted. Starting with empty logs and will regenerate the file."
+                )
+                logs = {}
+            except Exception as e:
+                logger.warning(
+                    f"Error loading logs from {file}: {e}. "
+                    "Starting with empty logs and will regenerate the file."
+                )
+                logs = {}
         return logs
+
+    def _convert_to_json_serializable(self, obj):
+        """Recursively convert NumPy types and other non-JSON-serializable types to native Python types."""
+        # Handle NumPy scalar types
+        if isinstance(obj, np.integer):
+            return int(obj)
+        elif isinstance(obj, np.floating):
+            return float(obj)
+        elif isinstance(obj, np.bool_):
+            return bool(obj)
+        elif isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {key: self._convert_to_json_serializable(value) for key, value in obj.items()}
+        elif isinstance(obj, (list, tuple)):
+            return [self._convert_to_json_serializable(item) for item in obj]
+        else:
+            return obj
 
     def save_logs(self, logs, file):
         """Save the logs in a json file"""
         logs = dict(sorted(logs.items()))
+        # Convert NumPy types and other non-JSON-serializable types to native Python types
+        logs = self._convert_to_json_serializable(logs)
         os.makedirs(os.path.dirname(file), exist_ok=True)
         try:
             with open(file, "w") as f:
@@ -47,7 +82,9 @@ class Evaluator:
 
     def load_metrics(self, metrics_cfg):
         """Load metrics for evaluation"""
+        logger.debug(f"Loading metrics from config: {list(metrics_cfg.keys())}")
         metrics = get_metrics(metrics_cfg)
+        logger.info(f"Loaded {len(metrics)} metric(s): {list(metrics.keys())}")
         return metrics
 
     def summarize(self, logs):

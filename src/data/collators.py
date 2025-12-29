@@ -2,6 +2,9 @@ import torch
 import transformers
 from typing import Dict, Sequence
 from data.utils import IGNORE_INDEX
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 
 class DataCollatorForSupervisedDataset(object):
@@ -16,6 +19,7 @@ class DataCollatorForSupervisedDataset(object):
         self.tokenizer = tokenizer
         self.padding_side = padding_side
         self.index = index
+        logger.debug(f"Initialized DataCollatorForSupervisedDataset with padding_side='{padding_side}', index='{index}'")
 
     def get_instances_from_key(self, instances: Sequence[Dict], key: str):
         ret_instances = [instance[key] for instance in instances]
@@ -36,6 +40,7 @@ class DataCollatorForSupervisedDataset(object):
 
     def __call__(self, instances: Sequence[Dict]) -> Dict[str, torch.Tensor]:
         assert isinstance(instances[0], dict)
+        logger.debug(f"Collating batch of {len(instances)} instances")
         return_dct = {}
         if "input_ids" not in instances[0]:
             for key in instances[0].keys():
@@ -63,5 +68,6 @@ class DataCollatorForSupervisedDataset(object):
                         }
                     )
                 else:
-                    raise Warning(f"{self.index} not found in dataset")
+                    logger.warning(f"{self.index} not found in dataset")
+        logger.debug(f"Collated batch shape: input_ids={return_dct.get('input_ids', 'N/A').shape if isinstance(return_dct.get('input_ids'), torch.Tensor) else 'N/A'}")
         return return_dct

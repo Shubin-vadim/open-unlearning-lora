@@ -4,6 +4,9 @@ import torch
 from torch import nn
 from packaging import version
 from trainer.base import FinetuneTrainer
+from utils.logging import get_logger
+
+logger = get_logger(__name__)
 
 from transformers.trainer_pt_utils import (
     nested_detach,
@@ -40,6 +43,7 @@ class UnlearnTrainer(FinetuneTrainer):
         """
         The only change to this function is calling the Trainer's compute_loss, as it's often overridden by unlearning methods, and we want to maintain the Trainer's evaluation setup.
         """
+        logger.debug(f"Starting prediction step: prediction_loss_only={prediction_loss_only}")
         has_labels = (
             False
             if len(self.label_names) == 0
@@ -54,6 +58,7 @@ class UnlearnTrainer(FinetuneTrainer):
         loss_without_labels = (
             True if len(self.label_names) == 0 and return_loss else False
         )
+        logger.debug(f"Prediction step config: has_labels={has_labels}, return_loss={return_loss}, loss_without_labels={loss_without_labels}")
 
         inputs = self._prepare_inputs(inputs)
         if ignore_keys is None:
@@ -63,6 +68,7 @@ class UnlearnTrainer(FinetuneTrainer):
                 )
             else:
                 ignore_keys = []
+        logger.debug(f"Ignore keys: {ignore_keys}")
 
         # labels may be popped when computing the loss (label smoothing for instance) so we grab them first.
         if has_labels or loss_without_labels:
@@ -74,6 +80,7 @@ class UnlearnTrainer(FinetuneTrainer):
 
         with torch.no_grad():
             if is_sagemaker_mp_enabled():
+                logger.debug("Using SageMaker Model Parallel for prediction")
                 raw_outputs = smp_forward_only(model, inputs)
                 if has_labels or loss_without_labels:
                     if isinstance(raw_outputs, dict):
@@ -100,12 +107,14 @@ class UnlearnTrainer(FinetuneTrainer):
                     logits = smp_nested_concat(logits_mb)
             else:
                 if has_labels or loss_without_labels:
+                    logger.debug("Computing loss using super().compute_loss() for evaluation")
                     with self.compute_loss_context_manager():
                         ### Call compute_loss of super class since overridden compute_loss is not be applicable to eval_dataset.
                         loss, outputs = super().compute_loss(
                             model, inputs, return_outputs=True
                         )
                     loss = loss.mean().detach()
+                    logger.debug(f"Computed loss: {loss.item() if loss is not None else None}")
 
                     if isinstance(outputs, dict):
                         logits = tuple(
@@ -130,10 +139,14 @@ class UnlearnTrainer(FinetuneTrainer):
                         self._past = outputs[self.args.past_index - 1]
 
         if prediction_loss_only:
+            logger.debug("Returning only loss (prediction_loss_only=True)")
             return (loss, None, None)
 
         logits = nested_detach(logits)
         if len(logits) == 1:
             logits = logits[0]
+        
+        logits_shape = logits.shape if hasattr(logits, 'shape') else 'N/A'
+        logger.debug(f"Prediction step completed: loss={loss.item() if loss is not None else None}, logits_shape={logits_shape}")
 
         return (loss, logits, labels)

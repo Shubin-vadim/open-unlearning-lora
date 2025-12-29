@@ -30,15 +30,18 @@ def probability(model, **kwargs):
     scores_by_index = run_batchwise_evals(
         model, dataloader, evaluate_probability, fun_args, "Calculating loss"
     )
-    prob_values = np.array(
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    prob_values = torch.tensor(
         [
             evals["prob"]
             for evals in scores_by_index.values()
             if evals["prob"] is not None
-        ]
+        ],
+        device=device
     )
     prob_values = aggregate_to_1D(prob_values)
-    return {"agg_value": np.mean(prob_values), "value_by_index": scores_by_index}
+    return {"agg_value": float(torch.mean(prob_values).item()), "value_by_index": scores_by_index}
 
 
 @unlearning_metric(name="probability_w_options")
@@ -59,17 +62,39 @@ def probability_w_options(model, **kwargs):
         if correct_answer_results[idx] is not None
         and wrong_answer_results[idx] is not None
     ]
-    correct = np.array(
-        [correct_answer_results[idx]["prob"] for idx in filtered_indices]
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    correct = torch.tensor(
+        [correct_answer_results[idx]["prob"] for idx in filtered_indices],
+        device=device
     )
-    all_wrong = np.array(
-        [wrong_answer_results[idx]["prob"] for idx in filtered_indices]
+    all_wrong = torch.tensor(
+        [wrong_answer_results[idx]["prob"] for idx in filtered_indices],
+        device=device
     )
-    wrong = np.sum(all_wrong, axis=tuple(range(1, all_wrong.ndim)))
+    # Sum along all dimensions except the first (batch dimension)
+    # If already 1D, this will sum over empty dims which returns the tensor as-is
+    if all_wrong.ndim > 1:
+        wrong = torch.sum(all_wrong, dim=tuple(range(1, all_wrong.ndim)))
+    else:
+        wrong = all_wrong
     probs = correct / (correct + wrong + 1e-10)
 
-    value_by_index = dict(zip(correct_indices, [{"prob": val} for val in probs]))
-    return {"agg_value": np.mean(probs), "value_by_index": value_by_index}
+    # Convert to numpy only at the end for return values
+    probs_np = probs.cpu().numpy()
+    # Create a mapping from index to position in filtered_indices for efficient lookup
+    filtered_idx_map = {idx: pos for pos, idx in enumerate(filtered_indices)}
+    # Create value_by_index with all indices, but only include computed values for filtered indices
+    value_by_index = {}
+    for idx in correct_indices:
+        if idx in filtered_idx_map:
+            # Get the position in filtered_indices to access the corresponding prob value
+            filtered_pos = filtered_idx_map[idx]
+            value_by_index[idx] = {"prob": probs_np[filtered_pos]}
+        else:
+            # Keep None for indices that were filtered out
+            value_by_index[idx] = {"prob": None}
+    return {"agg_value": float(torch.mean(probs).item()), "value_by_index": value_by_index}
 
 
 @unlearning_metric(name="rouge")
@@ -90,16 +115,19 @@ def rouge(model, **kwargs):
         fun_args,
         "Calculating text similarity",
     )
-    rouge_values = np.array(
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    rouge_values = torch.tensor(
         [
             evals[kwargs["rouge_type"]]
             for evals in scores_by_index.values()
             if evals[kwargs["rouge_type"]] is not None
-        ]
+        ],
+        device=device
     )
     rouge_values = aggregate_to_1D(rouge_values)
     return {
-        "agg_value": np.mean(rouge_values),
+        "agg_value": float(torch.mean(rouge_values).item()),
         "value_by_index": scores_by_index,
     }
 
@@ -112,12 +140,18 @@ def truth_ratio(model, **kwargs):
     # Forget data: It is better if false and true are equally likely,
     # i.e., tr=false/true is closest to 1.
     def closer_to_1_better(arr):
-        return np.mean(np.minimum(arr, 1 / (arr + 1e-10)))
+        if isinstance(arr, torch.Tensor):
+            return torch.mean(torch.minimum(arr, 1 / (arr + 1e-10))).item()
+        else:
+            return np.mean(np.minimum(arr, 1 / (arr + 1e-10)))
 
     # Non-forget data: It is better if tr=false/true is lower, i.e.,
     # 1-tr is higher.
     def true_better(arr):
-        return np.mean(np.maximum(0, 1 - arr))
+        if isinstance(arr, torch.Tensor):
+            return torch.mean(torch.clamp(1 - arr, min=0)).item()
+        else:
+            return np.mean(np.maximum(0, 1 - arr))
 
     if kwargs["aggregator"] == "closer_to_1_better":
         aggregator = closer_to_1_better
@@ -147,18 +181,28 @@ def truth_ratio(model, **kwargs):
         wrong_answer_results[idx]["avg_loss"] for idx in filtered_indices
     ]
 
-    correct_avg_losses = aggregate_to_1D(np.array(correct_avg_losses))
-    wrong_avg_losses = aggregate_to_1D(np.array(wrong_avg_losses))
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    correct_avg_losses = torch.tensor(correct_avg_losses, device=device)
+    wrong_avg_losses = torch.tensor(wrong_avg_losses, device=device)
+    
+    correct_avg_losses = aggregate_to_1D(correct_avg_losses)
+    wrong_avg_losses = aggregate_to_1D(wrong_avg_losses)
 
-    correct_prob = np.exp(-correct_avg_losses)
-    wrong_prob = np.exp(-wrong_avg_losses)
+    correct_prob = torch.exp(-correct_avg_losses)
+    wrong_prob = torch.exp(-wrong_avg_losses)
 
     truth_ratios = wrong_prob / (correct_prob + 1e-10)
-    value_by_index = dict(
-        zip(correct_indices, [{"score": val} for val in truth_ratios])
-    )
-    truth_ratio_stats = np.array([evals["score"] for evals in value_by_index.values()])
+    
+    # Keep computations on GPU for aggregation
+    truth_ratio_stats = truth_ratios
     forget_tr_avg = aggregator(truth_ratio_stats)
+    
+    # Convert to numpy only at the end for return values
+    truth_ratios_np = truth_ratios.cpu().numpy()
+    value_by_index = dict(
+        zip(correct_indices, [{"score": val} for val in truth_ratios_np])
+    )
     return {"agg_value": forget_tr_avg, "value_by_index": value_by_index}
 
 
@@ -187,8 +231,11 @@ def exact_memorization(model, **kwargs):
                 )
                 em_batch.append({"score": None})
             else:
+                # Keep computations on GPU
                 preds = torch.argmax(log_probs, dim=-1)
-                em_score = (preds == labels).sum() / valid_len
+                valid_len_tensor = torch.tensor(valid_len, device=log_probs.device, dtype=torch.float32)
+                em_score = (preds == labels).sum().float() / valid_len_tensor
+                # Convert to Python float only at the end
                 em_batch.append({"score": em_score.item()})
         return em_batch
 
@@ -196,15 +243,18 @@ def exact_memorization(model, **kwargs):
     scores_by_index = run_batchwise_evals(
         model, dataloader, _exact_memorization, fun_args, "Calculating EM"
     )
-    em_values = np.array(
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    em_values = torch.tensor(
         [
             evals["score"]
             for evals in scores_by_index.values()
             if evals["score"] is not None
-        ]
+        ],
+        device=device
     )
     em_values = aggregate_to_1D(em_values)
-    return {"agg_value": np.mean(em_values), "value_by_index": scores_by_index}
+    return {"agg_value": float(torch.mean(em_values).item()), "value_by_index": scores_by_index}
 
 
 @unlearning_metric(name="extraction_strength")
@@ -221,12 +271,6 @@ def extraction_strength(model, **kwargs):
         es_batch = []
         for log_probs, labels in zip(log_probs_batch, labels_batch):
             valid_len = len(labels)
-            preds = torch.argmax(log_probs, dim=-1)
-            for k in range(valid_len):
-                suff_preds = preds[k:]
-                suff_labels = labels[k:]
-                if torch.equal(suff_preds, suff_labels):
-                    break
             if valid_len == 0:
                 # Rarely, tokenization can result in a mismatch with no valid target
                 # tokens for loss computation (see preprocess_chat_instance() for
@@ -238,20 +282,37 @@ def extraction_strength(model, **kwargs):
                 )
                 es_batch.append({"score": 0})
             else:
-                es_score = 1 - (k / valid_len)
-                es_batch.append({"score": es_score})
+                # Keep computations on GPU
+                device = log_probs.device
+                preds = torch.argmax(log_probs, dim=-1)
+                valid_len_tensor = torch.tensor(valid_len, device=device, dtype=torch.float32)
+                k = valid_len  # Default value if no match found
+                for k_idx in range(valid_len):
+                    suff_preds = preds[k_idx:]
+                    suff_labels = labels[k_idx:]
+                    if torch.equal(suff_preds, suff_labels):
+                        k = k_idx
+                        break
+                # Keep computation on GPU
+                k_tensor = torch.tensor(k, device=device, dtype=torch.float32)
+                es_score = 1 - (k_tensor / valid_len_tensor)
+                # Convert to Python float only at the end
+                es_batch.append({"score": es_score.item()})
         return es_batch
 
     fun_args = {}
     scores_by_index = run_batchwise_evals(
         model, dataloader, _extraction_strength, fun_args, "Calculating ES"
     )
-    es_values = np.array(
+    # Use torch tensors on GPU instead of numpy arrays
+    device = next(model.parameters()).device
+    es_values = torch.tensor(
         [
             evals["score"]
             for evals in scores_by_index.values()
             if evals["score"] is not None
-        ]
+        ],
+        device=device
     )
     es_values = aggregate_to_1D(es_values)
-    return {"agg_value": np.mean(es_values), "value_by_index": scores_by_index}
+    return {"agg_value": float(torch.mean(es_values).item()), "value_by_index": scores_by_index}

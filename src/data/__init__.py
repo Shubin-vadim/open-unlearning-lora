@@ -7,8 +7,9 @@ from data.collators import DataCollatorForSupervisedDataset
 from data.pretraining import CompletionDataset, PretrainingDataset
 from data.qa import QAwithAlternateDataset, QAwithIdkDataset, QADataset
 from data.unlearn import ForgetRetainDataset
+from utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 DATASET_REGISTRY: Dict[str, Any] = {}
 COLLATOR_REGISTRY: Dict[str, Any] = {}
@@ -34,7 +35,10 @@ def _load_single_dataset(dataset_name, dataset_cfg: DictConfig, **kwargs):
         )
     dataset_args = dataset_cfg.args
     logger.debug(f"Loading dataset '{dataset_name}' with handler '{dataset_handler_name}'")
-    return dataset_handler(**dataset_args, **kwargs)
+    logger.debug(f"Dataset args: {dataset_args}")
+    dataset = dataset_handler(**dataset_args, **kwargs)
+    logger.info(f"Successfully loaded dataset '{dataset_name}' with {len(dataset)} samples")
+    return dataset
 
 
 def get_datasets(dataset_cfgs: Union[Dict, DictConfig], **kwargs):
@@ -82,7 +86,11 @@ def _get_single_collator(collator_name: str, collator_cfg: DictConfig, **kwargs)
             f"{collator_handler_name} not implemented or not registered"
         )
     collator_args = collator_cfg.args
-    return collator_handler(**collator_args, **kwargs)
+    logger.debug(f"Loading collator '{collator_name}' with handler '{collator_handler_name}'")
+    logger.debug(f"Collator args: {collator_args}")
+    collator = collator_handler(**collator_args, **kwargs)
+    logger.info(f"Successfully loaded collator '{collator_name}'")
+    return collator
 
 
 def get_collators(collator_cfgs, **kwargs):

@@ -17,6 +17,7 @@ setup(
         "numpy==2.2.3",
         "hydra-core==1.3",
         "hydra_colorlog==1.2.0",
+        "colorlog==6.10.1",
         "torch==2.4.1",
         "datasets==3.0.1",
         "accelerate==0.34.2",

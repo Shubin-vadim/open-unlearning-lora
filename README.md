@@ -231,7 +231,18 @@ set HF_HOME=~/.cache/huggingface  # Optional
 python setup_data.py --eval # saves/eval now contains evaluation results of the uploaded models
 # This downloads log files with evaluation results (including retain model logs)
 # into `saves/eval`, used for evaluating unlearning across supported benchmarks.
-# Additional datasets (e.g., WMDP) are supported — run below for options:
+
+# For WMDP benchmark, download the corpora:
+python setup_data.py --wmdp
+# This downloads and extracts WMDP corpora into data/wmdp/wmdp-corpora/
+
+# Note: The pipeline scripts (tofu_full_pipeline_lora.sh, muse_full_pipeline_lora.sh, wmdp_full_pipeline_lora.sh)
+# will automatically check and download required data if missing:
+# - TOFU/MUSE: Evaluation logs (via --eval_logs flag)
+# - WMDP: Corpora files (via --wmdp flag)
+# - Datasets from HuggingFace (TOFU, MUSE) are downloaded automatically when needed
+
+# Additional datasets (e.g., IDK) are supported — run below for options:
 # python setup_data.py --help
 ```
 
@@ -293,13 +304,29 @@ bash scripts/muse_unlearn.sh
 
 The above scripts are not tuned and uses default hyper parameter settings. We encourage you to tune your methods and add your final results in [`community/leaderboard.md`](community/leaderboard.md).
 
-**Complete Pipeline Example**: For a full workflow example (fine-tuning → retain model → evaluation → unlearning → evaluation) using Qwen2.5-3B-Instruct, see [`scripts/qwen3b_full_pipeline.sh`](scripts/qwen3b_full_pipeline.sh):
+**Complete Pipeline Examples**: For full workflow examples (fine-tuning → retain model → evaluation → unlearning → evaluation) using Qwen2.5-3B-Instruct with LoRA, see the following scripts:
 
+**TOFU Benchmark:**
 ```bash
-bash scripts/qwen3b_full_pipeline.sh
+bash scripts/tofu_full_pipeline_lora.sh
 ```
 
-This script demonstrates the complete cycle of training, unlearning, and evaluation on the TOFU benchmark.
+**MUSE Benchmark:**
+```bash
+bash scripts/muse_full_pipeline_lora.sh
+```
+
+**WMDP Benchmark:**
+```bash
+bash scripts/wmdp_full_pipeline_lora.sh
+```
+
+These scripts demonstrate the complete cycle of training, unlearning, and evaluation on their respective benchmarks. All scripts use LoRA for memory-efficient training and are optimized for limited GPU memory (single GPU with 8GB+ VRAM).
+
+**Configuration options:**
+- Modify `MODEL`, `DATA_SPLIT`, `TRAINER`, and other parameters at the top of each script
+- Adjust `PER_DEVICE_TRAIN_BATCH_SIZE` and `GRADIENT_ACCUMULATION_STEPS` based on your GPU memory
+- Enable/disable `USE_8BIT_OPTIMIZER` for additional memory savings
 
 ### 🎯 Running Experiments with LoRA
 
@@ -346,6 +373,34 @@ cd community/methods/LoRA
 # With a different model
 ./run.sh --model Llama-2-7b-hf-lora --type unlearn
 ```
+
+**Full Pipeline Scripts with LoRA:**
+
+For complete end-to-end workflows with LoRA, use the dedicated pipeline scripts:
+
+**TOFU Full Pipeline:**
+```bash
+bash scripts/tofu_full_pipeline_lora.sh
+```
+This script runs the complete TOFU workflow: baseline evaluation → fine-tuning on full dataset → fine-tuning retain model → retain evaluation → unlearning → unlearned evaluation.
+
+**MUSE Full Pipeline:**
+```bash
+bash scripts/muse_full_pipeline_lora.sh
+```
+This script runs the complete MUSE workflow for News or Books datasets. Configure `DATA_SPLIT` (News/Books), `FORGET_SPLIT`, and `RETAIN_SPLIT` at the top of the script.
+
+**WMDP Full Pipeline:**
+```bash
+bash scripts/wmdp_full_pipeline_lora.sh
+```
+This script runs the complete WMDP workflow for cyber or bio datasets. Configure `DATA_SPLIT` (cyber/bio) at the top of the script. WMDP typically uses pre-trained models, so the script focuses on unlearning and evaluation.
+
+All pipeline scripts include:
+- Memory-optimized settings (small batch sizes, gradient accumulation, 8-bit optimizer support)
+- Automatic GPU cache clearing
+- Detailed progress logging with colored output
+- Configurable parameters at the top of each script
 
 **Available LoRA models:**
 - `Qwen2.5-3B-Instruct-lora` (default)

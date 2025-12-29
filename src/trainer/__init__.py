@@ -6,8 +6,9 @@ from omegaconf import DictConfig
 from transformers import TrainingArguments, Trainer
 
 from trainer.base import FinetuneTrainer
+from utils.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 TRAINER_REGISTRY: Dict[str, Any] = {}
 
@@ -50,14 +51,28 @@ def load_trainer_args(trainer_args: DictConfig, dataset):
     if warmup_epochs:
         batch_size = trainer_args["per_device_train_batch_size"]
         grad_accum_steps = trainer_args["gradient_accumulation_steps"]
-        num_devices = torch.cuda.device_count()
-        dataset_len = len(dataset)
-        trainer_args["warmup_steps"] = int(
-            (warmup_epochs * dataset_len)
-            // (batch_size * grad_accum_steps * num_devices)
-        )
+        num_devices = torch.cuda.device_count() or 1  # Default to 1 if no CUDA devices
+        dataset_len = len(dataset) if dataset is not None else 0
+        
+        if dataset_len == 0:
+            logger.warning("Dataset is empty, setting warmup_steps to 0")
+            warmup_steps = 0
+        else:
+            denominator = batch_size * grad_accum_steps * num_devices
+            if denominator == 0:
+                logger.warning(f"Denominator is zero (batch_size={batch_size}, grad_accum_steps={grad_accum_steps}, num_devices={num_devices}), setting warmup_steps to 0")
+                warmup_steps = 0
+            else:
+                warmup_steps = int(
+                    (warmup_epochs * dataset_len)
+                    // denominator
+                )
+        trainer_args["warmup_steps"] = warmup_steps
+        logger.info(f"Calculated warmup_steps={warmup_steps} from warmup_epochs={warmup_epochs}, dataset_len={dataset_len}, batch_size={batch_size}, grad_accum_steps={grad_accum_steps}, num_devices={num_devices}")
 
+    logger.debug(f"Training arguments: {trainer_args}")
     trainer_args = TrainingArguments(**trainer_args)
+    logger.info(f"Initialized TrainingArguments with output_dir={trainer_args.output_dir}")
     return trainer_args
 
 
@@ -73,6 +88,9 @@ def load_trainer(
 ):
     trainer_args = trainer_cfg.args
     method_args = trainer_cfg.get("method_args", {})
+    logger.info(f"Loading trainer with handler: {trainer_cfg.get('handler')}")
+    if method_args:
+        logger.debug(f"Method-specific args: {method_args}")
     trainer_args = load_trainer_args(trainer_args, train_dataset)
     trainer_handler_name = trainer_cfg.get("handler")
     assert trainer_handler_name is not None, ValueError(
@@ -81,11 +99,16 @@ def load_trainer(
     trainer_cls = TRAINER_REGISTRY.get(trainer_handler_name, None)
     # If trainer not found, try lazy loading unlearn trainers
     if trainer_cls is None:
+        logger.debug(f"Trainer '{trainer_handler_name}' not found in registry, attempting lazy import")
         _lazy_import_unlearn_trainers()
         trainer_cls = TRAINER_REGISTRY.get(trainer_handler_name, None)
     assert trainer_cls is not None, NotImplementedError(
         f"{trainer_handler_name} not implemented or not registered"
     )
+    logger.info(f"Initializing {trainer_handler_name} trainer")
+    train_size = len(train_dataset) if train_dataset is not None else 0
+    eval_size = len(eval_dataset) if eval_dataset is not None else 0
+    logger.debug(f"Train dataset size: {train_size}, Eval dataset size: {eval_size}")
     trainer = trainer_cls(
         model=model,
         train_dataset=train_dataset,

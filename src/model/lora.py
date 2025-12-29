@@ -1,5 +1,6 @@
 import json
 import logging
+from utils.logging import get_logger
 import os
 from pathlib import Path
 from typing import Optional
@@ -16,7 +17,7 @@ load_dotenv(env_path)
 
 hf_home = os.getenv("HF_HOME", default=None)
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 def get_hf_token() -> Optional[str]:
@@ -177,6 +178,8 @@ def get_lora_model(model_cfg: DictConfig):
     
     with open_dict(model_args):
         model_path = model_args.pop("pretrained_model_name_or_path", None)
+        # Use device_map from config or default to "auto" for GPU
+        device_map = model_args.pop("device_map", "auto")
         if hf_token and "token" not in model_args:
             model_args["token"] = hf_token
 
@@ -186,6 +189,7 @@ def get_lora_model(model_cfg: DictConfig):
             pretrained_model_name_or_path=model_path,
             lora_config=lora_config,
             torch_dtype=torch_dtype,
+            device_map=device_map,
             cache_dir=hf_home,
             **model_args,
         )

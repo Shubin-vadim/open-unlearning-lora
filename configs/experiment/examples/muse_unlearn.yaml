@@ -191,46 +191,46 @@ eval:
         batch_size: 8
       privleak:
         pre_compute:
-          # mia_min_k:
-          #   datasets:
-          #     MUSE_MIA_holdout:
-          #       access_key: holdout
-          #       handler: CompletionDataset
-          #       args:
-          #         hf_args:
-          #           path: muse-bench/MUSE-${eval.muse.data_split}
-          #           name: privleak
-          #           split: holdout
-          #         prefix_key: prompt
-          #         text_key: text
-          #         max_length: 2048
-          #     MUSE_MIA_forget:
-          #       access_key: forget
-          #       handler: CompletionDataset
-          #       args:
-          #         hf_args:
-          #           path: muse-bench/MUSE-${eval.muse.data_split}
-          #           name: privleak
-          #           split: forget
-          #         prefix_key: prompt
-          #         text_key: text
-          #         max_length: 2048
-          #   collators:
-          #     DataCollatorForSupervisedDataset:
-          #       handler: DataCollatorForSupervisedDataset
-          #       args:
-          #         padding_side: right
-          #         index: index
-          #   batch_size: 8
-          #   handler: mia_min_k
-          #   k: 0.4
-          #   access_key: forget
+          mia_min_k:
+            datasets:
+              MUSE_MIA_holdout:
+                access_key: holdout
+                handler: CompletionDataset
+                args:
+                  hf_args:
+                    path: muse-bench/MUSE-${eval.muse.data_split}
+                    name: privleak
+                    split: holdout
+                  prefix_key: prompt
+                  text_key: text
+                  max_length: 2048
+              MUSE_MIA_forget:
+                access_key: forget
+                handler: CompletionDataset
+                args:
+                  hf_args:
+                    path: muse-bench/MUSE-${eval.muse.data_split}
+                    name: privleak
+                    split: forget
+                  prefix_key: prompt
+                  text_key: text
+                  max_length: 2048
+            collators:
+              DataCollatorForSupervisedDataset:
+                handler: DataCollatorForSupervisedDataset
+                args:
+                  padding_side: right
+                  index: index
+            batch_size: 8
+            handler: mia_min_k
+            k: 0.4
+            access_key: forget
         reference_logs:
           retain_model_logs:
             path: ${eval.muse.retain_logs_path}
             include:
-              # mia_min_k:
-              #   access_key: retain
+              mia_min_k:
+                access_key: retain
         handler: privleak
         ref_value: 0.5
       extraction_strength:

@@ -4,6 +4,6 @@ MUSE_retain:
     hf_args:
       path: "muse-bench/MUSE-News"
       name: "raw"
-      split: "retain"
+      split: "retain1"
     text_key: "text"
     max_length: 2048

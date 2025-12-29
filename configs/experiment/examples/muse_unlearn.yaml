@@ -267,7 +267,7 @@ paths:
   work_dir: ${hydra:runtime.cwd}
 data_split: News
 forget_split: forget
-retain_split: retain
+retain_split: retain1
 retain_logs_path: saves/eval/muse_Llama-2-7b-hf_News_retrain/MUSE_EVAL.json
 task_name: muse_npo_unlearn
 mode: unlearn

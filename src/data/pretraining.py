@@ -26,7 +26,28 @@ class CompletionDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_length = max_length
         logger.info(f"Loading CompletionDataset with hf_args: {hf_args}")
-        self.data = load_hf_dataset(**hf_args)
+        
+        # Handle common MUSE dataset split naming issue
+        if hf_args.get("split") == "retain" and "muse-bench/MUSE" in hf_args.get("path", ""):
+            logger.warning(
+                "MUSE dataset does not have a 'retain' split. "
+                "Available splits are: 'retain1', 'retain2', 'forget', 'holdout'. "
+                "Using 'retain1' as fallback. To use both retain splits, use 'retain1+retain2'."
+            )
+            hf_args = hf_args.copy()
+            hf_args["split"] = "retain1"
+        
+        try:
+            self.data = load_hf_dataset(**hf_args)
+        except ValueError as e:
+            if "Unknown split" in str(e) and "retain" in str(e):
+                logger.error(
+                    f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
+                    "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
+                    "To use both retain splits, use 'retain1+retain2'."
+                )
+            raise
+        
         self.data = add_dataset_index(self.data)
         logger.info(f"Loaded {len(self.data)} completion samples")
         # if either key does not exist in dataset, it is taken as ""
@@ -73,7 +94,28 @@ class PretrainingDataset(Dataset):
         self.tokenizer = tokenizer
         self.max_length = max_length
         logger.info(f"Loading PretrainingDataset with hf_args: {hf_args}")
-        raw_data = load_hf_dataset(**hf_args)
+        
+        # Handle common MUSE dataset split naming issue
+        if hf_args.get("split") == "retain" and "muse-bench/MUSE" in hf_args.get("path", ""):
+            logger.warning(
+                "MUSE dataset does not have a 'retain' split. "
+                "Available splits are: 'retain1', 'retain2', 'forget', 'holdout'. "
+                "Using 'retain1' as fallback. To use both retain splits, use 'retain1+retain2'."
+            )
+            hf_args = hf_args.copy()
+            hf_args["split"] = "retain1"
+        
+        try:
+            raw_data = load_hf_dataset(**hf_args)
+        except ValueError as e:
+            if "Unknown split" in str(e) and "retain" in str(e):
+                logger.error(
+                    f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
+                    "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
+                    "To use both retain splits, use 'retain1+retain2'."
+                )
+            raise
+        
         logger.info(f"Loaded raw data with {len(raw_data[text_key])} text entries")
         self.chunks = self._chunk_raw_text(raw_data[text_key])
         logger.info(f"Created {len(self.chunks)} chunks from raw text (max_length={max_length})")

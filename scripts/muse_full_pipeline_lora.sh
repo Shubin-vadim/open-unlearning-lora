@@ -20,7 +20,7 @@ cd "$PROJECT_ROOT"
 MODEL="Qwen2.5-3B-Instruct"  # Original model from HuggingFace, will use LoRA for training
 DATA_SPLIT="News"  # Options: News, Books
 FORGET_SPLIT="forget"
-RETAIN_SPLIT="retain"
+RETAIN_SPLIT="retain1"  # MUSE dataset has 'retain1' and 'retain2' splits, not 'retain'
 TRAINER="GradAscent"
 
 # Training parameters

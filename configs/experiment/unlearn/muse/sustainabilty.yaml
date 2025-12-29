@@ -10,7 +10,7 @@ defaults:
 
 data_split: News
 forget_split: forget_4
-retain_split: retain1
+retain_split: retain
 retain_logs_path: null
 
 model:

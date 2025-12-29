@@ -13,6 +13,6 @@ datasets:
       hf_args:
         path: muse-bench/MUSE-${eval.muse.data_split}
 
-batch_size: 8
+batch_size: 1
 handler: mia_min_k
 k: 0.4

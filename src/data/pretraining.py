@@ -27,25 +27,53 @@ class CompletionDataset(Dataset):
         self.max_length = max_length
         logger.info(f"Loading CompletionDataset with hf_args: {hf_args}")
         
-        # Handle common MUSE dataset split naming issue
-        if hf_args.get("split") == "retain" and "muse-bench/MUSE" in hf_args.get("path", ""):
+        # Handle MUSE dataset split naming issues
+        hf_args = hf_args.copy()
+        path = hf_args.get("path", "")
+        split = hf_args.get("split")
+        
+        # Handle muse-bench/MUSE datasets: map 'retain' to 'retain1'
+        if split == "retain" and "muse-bench/MUSE" in path:
             logger.warning(
                 "MUSE dataset does not have a 'retain' split. "
                 "Available splits are: 'retain1', 'retain2', 'forget', 'holdout'. "
                 "Using 'retain1' as fallback. To use both retain splits, use 'retain1+retain2'."
             )
-            hf_args = hf_args.copy()
             hf_args["split"] = "retain1"
+        
+        # Handle tamarsonha/MUSE datasets: map 'retain1'/'retain2' to 'retain'
+        elif split in ("retain1", "retain2") and "tamarsonha/MUSE" in path:
+            logger.info(
+                f"Mapping split '{split}' to 'retain' for tamarsonha/MUSE dataset. "
+                "Available splits are: 'full', 'retain'."
+            )
+            hf_args["split"] = "retain"
         
         try:
             self.data = load_hf_dataset(**hf_args)
         except ValueError as e:
-            if "Unknown split" in str(e) and "retain" in str(e):
-                logger.error(
-                    f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
-                    "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
-                    "To use both retain splits, use 'retain1+retain2'."
-                )
+            if "Unknown split" in str(e):
+                error_msg = str(e)
+                # Try to extract available splits from error message
+                if "Should be one of" in error_msg:
+                    logger.error(
+                        f"Invalid split '{hf_args.get('split')}' for dataset '{path}'. {error_msg}"
+                    )
+                elif "retain" in error_msg.lower():
+                    if "tamarsonha/MUSE" in path:
+                        logger.error(
+                            f"Invalid split '{split}' for tamarsonha/MUSE dataset. "
+                            "Available splits are: 'full', 'retain'. "
+                            "Note: 'retain1' and 'retain2' are automatically mapped to 'retain'."
+                        )
+                    else:
+                        logger.error(
+                            f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
+                            "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
+                            "To use both retain splits, use 'retain1+retain2'."
+                        )
+                else:
+                    logger.error(f"Invalid split '{hf_args.get('split')}' for dataset '{path}'. {error_msg}")
             raise
         
         self.data = add_dataset_index(self.data)
@@ -95,25 +123,53 @@ class PretrainingDataset(Dataset):
         self.max_length = max_length
         logger.info(f"Loading PretrainingDataset with hf_args: {hf_args}")
         
-        # Handle common MUSE dataset split naming issue
-        if hf_args.get("split") == "retain" and "muse-bench/MUSE" in hf_args.get("path", ""):
+        # Handle MUSE dataset split naming issues
+        hf_args = hf_args.copy()
+        path = hf_args.get("path", "")
+        split = hf_args.get("split")
+        
+        # Handle muse-bench/MUSE datasets: map 'retain' to 'retain1'
+        if split == "retain" and "muse-bench/MUSE" in path:
             logger.warning(
                 "MUSE dataset does not have a 'retain' split. "
                 "Available splits are: 'retain1', 'retain2', 'forget', 'holdout'. "
                 "Using 'retain1' as fallback. To use both retain splits, use 'retain1+retain2'."
             )
-            hf_args = hf_args.copy()
             hf_args["split"] = "retain1"
+        
+        # Handle tamarsonha/MUSE datasets: map 'retain1'/'retain2' to 'retain'
+        elif split in ("retain1", "retain2") and "tamarsonha/MUSE" in path:
+            logger.info(
+                f"Mapping split '{split}' to 'retain' for tamarsonha/MUSE dataset. "
+                "Available splits are: 'full', 'retain'."
+            )
+            hf_args["split"] = "retain"
         
         try:
             raw_data = load_hf_dataset(**hf_args)
         except ValueError as e:
-            if "Unknown split" in str(e) and "retain" in str(e):
-                logger.error(
-                    f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
-                    "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
-                    "To use both retain splits, use 'retain1+retain2'."
-                )
+            if "Unknown split" in str(e):
+                error_msg = str(e)
+                # Try to extract available splits from error message
+                if "Should be one of" in error_msg:
+                    logger.error(
+                        f"Invalid split '{hf_args.get('split')}' for dataset '{path}'. {error_msg}"
+                    )
+                elif "retain" in error_msg.lower():
+                    if "tamarsonha/MUSE" in path:
+                        logger.error(
+                            f"Invalid split '{split}' for tamarsonha/MUSE dataset. "
+                            "Available splits are: 'full', 'retain'. "
+                            "Note: 'retain1' and 'retain2' are automatically mapped to 'retain'."
+                        )
+                    else:
+                        logger.error(
+                            f"Invalid split '{hf_args.get('split')}' for MUSE dataset. "
+                            "Available splits: 'retain1', 'retain2', 'forget', 'holdout'. "
+                            "To use both retain splits, use 'retain1+retain2'."
+                        )
+                else:
+                    logger.error(f"Invalid split '{hf_args.get('split')}' for dataset '{path}'. {error_msg}")
             raise
         
         logger.info(f"Loaded raw data with {len(raw_data[text_key])} text entries")

@@ -6,12 +6,12 @@
 
   <div style="display: flex; gap: 10px; justify-content: center; align-items: center;">
     <a href="https://arxiv.org/abs/2506.12618"><img src="https://img.shields.io/badge/arXiv-Report-b31b1b?logo=arxiv&logoColor=white" alt="arXiv Paper"/></a>
-    <a href="https://github.com/locuslab/open-unlearning"><img src="https://img.shields.io/github/stars/locuslab/open-unlearning?style=social" alt="GitHub Repo stars"/></a>
-    <a href="https://github.com/locuslab/open-unlearning/actions"><img src="https://github.com/locuslab/open-unlearning/actions/workflows/tests.yml/badge.svg" alt="Build Status"/></a>
+    <a href="https://github.com/Shubin-vadim/open-unlearning-lora"><img src="https://img.shields.io/github/stars/Shubin-vadim/open-unlearning-lora?style=social" alt="GitHub Repo stars"/></a>
+    <!-- <a href="https://github.com/locuslab/open-unlearning/actions"><img src="https://github.com/locuslab/open-unlearning/actions/workflows/tests.yml/badge.svg" alt="Build Status"/></a>-->
     <a href="https://huggingface.co/open-unlearning"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue" alt="HuggingFace 🤗"/></a>
-    <a href="https://github.com/locuslab/open-unlearning"><img src="https://img.shields.io/github/repo-size/locuslab/open-unlearning" alt="GitHub repo size"/></a>
-    <a href="https://github.com/locuslab/open-unlearning"><img src="https://img.shields.io/github/languages/top/locuslab/open-unlearning" alt="GitHub top language"/></a>
-    <a href="https://github.com/locuslab/open-unlearning/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="License: MIT"/></a>
+    <a href="https://github.com/Shubin-vadim/open-unlearning-lora"><img src="https://img.shields.io/github/repo-size/Shubin-vadim/open-unlearning-lora" alt="GitHub repo size"/></a>
+    <a href="https://github.com/Shubin-vadim/open-unlearning-lora"><img src="https://img.shields.io/github/languages/top/Shubin-vadim/open-unlearning-lora" alt="GitHub top language"/></a>
+    <a href="https://github.com/Shubin-vadim/open-unlearning-lora/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue" alt="License: MIT"/></a>
   </div>
 </div>
 
@@ -481,4 +481,5 @@ This project is licensed under the MIT License. See the [`LICENSE`](LICENSE) fil
 
 ---
 
-[![Star History Chart](https://api.star-history.com/svg?repos=locuslab/open-unlearning&type=Date)](https://www.star-history.com/#locuslab/open-unlearning&Date)
+## Star History
+[![Star History Chart](https://api.star-history.com/svg?repos=Shubin-vadim/open-unlearning-lora&type=date&legend=top-left)](https://www.star-history.com/#Shubin-vadim/open-unlearning-lora&type=date&legend=top-left)

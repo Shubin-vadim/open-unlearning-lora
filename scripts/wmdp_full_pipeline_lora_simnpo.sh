@@ -200,6 +200,9 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     trainer.method_args.gamma=${GAMMA} \
     trainer.method_args.alpha=${ALPHA} \
     trainer.method_args.retain_loss_type=${RETAIN_LOSS_TYPE} \
+    ~trainer.method_args.steering_coeff \
+    ~trainer.method_args.module_regex \
+    ~trainer.method_args.trainable_params_regex \
     trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
     trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
     trainer.args.gradient_checkpointing=True"

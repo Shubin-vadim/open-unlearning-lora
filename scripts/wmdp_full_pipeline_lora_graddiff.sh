@@ -197,6 +197,7 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     task_name=${UNLEARN_TASK_NAME} \
     data_split=${DATA_SPLIT} \
     model.model_args.pretrained_model_name_or_path=${BASE_MODEL_PATH} \
+    model.model_args.device_map=auto \
     trainer.method_args.gamma=${GAMMA} \
     trainer.method_args.alpha=${ALPHA} \
     trainer.method_args.retain_loss_type=${RETAIN_LOSS_TYPE} \
@@ -205,7 +206,8 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     ~trainer.method_args.trainable_params_regex \
     trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
     trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
-    trainer.args.gradient_checkpointing=True"
+    trainer.args.gradient_checkpointing=True \
+    trainer.args.dataloader_pin_memory=False"
 
 if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
     TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"

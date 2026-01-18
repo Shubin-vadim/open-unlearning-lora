@@ -32,6 +32,63 @@ else:
 
 
 class UnlearnTrainer(FinetuneTrainer):
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Enable gradient checkpointing on base model for PEFT/LoRA models
+        # This is necessary because PEFT models need gradient checkpointing enabled
+        # on the base model, not just the wrapper
+        if self.args.gradient_checkpointing:
+            self._enable_gradient_checkpointing_for_peft()
+    
+    def _enable_gradient_checkpointing_for_peft(self):
+        """Enable gradient checkpointing on base model for PEFT/LoRA models."""
+        try:
+            # Check if model is a PEFT model
+            if hasattr(self.model, 'base_model'):
+                # Disable use_cache when gradient checkpointing is enabled
+                # This is required for compatibility with gradient checkpointing
+                if hasattr(self.model, 'config') and hasattr(self.model.config, 'use_cache'):
+                    self.model.config.use_cache = False
+                    logger.info("Disabled use_cache for gradient checkpointing compatibility")
+                
+                # Enable input require grads for PEFT models
+                # This ensures that inputs can participate in the gradient computation graph
+                try:
+                    if hasattr(self.model, 'enable_input_require_grads'):
+                        self.model.enable_input_require_grads()
+                        logger.info("Enabled input require grads for PEFT/LoRA model")
+                except Exception as e:
+                    logger.debug(f"Could not enable input require grads (may not be available): {e}")
+                
+                base_model = self.model.base_model
+                # Check if base_model has a model attribute (for nested structures)
+                if hasattr(base_model, 'model'):
+                    base_model = base_model.model
+                
+                # Disable use_cache on base model config as well
+                if hasattr(base_model, 'config') and hasattr(base_model.config, 'use_cache'):
+                    base_model.config.use_cache = False
+                
+                # Enable gradient checkpointing on the base model
+                if hasattr(base_model, 'gradient_checkpointing_enable'):
+                    base_model.gradient_checkpointing_enable()
+                    logger.info("Enabled gradient checkpointing on base model for PEFT/LoRA")
+                elif hasattr(base_model, 'config'):
+                    # For some models, we need to enable it via config
+                    if hasattr(base_model.config, 'gradient_checkpointing'):
+                        base_model.config.gradient_checkpointing = True
+                        logger.info("Enabled gradient checkpointing via config for PEFT/LoRA")
+                
+                # Verify that trainable parameters exist
+                trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+                if trainable_params == 0:
+                    logger.warning("No trainable parameters found! Gradient checkpointing may not work correctly.")
+                else:
+                    logger.debug(f"Found {trainable_params:,} trainable parameters for gradient checkpointing")
+        except Exception as e:
+            logger.warning(f"Could not enable gradient checkpointing for PEFT model: {e}")
+            # Don't fail if we can't enable it - let the Trainer handle it
 
     def prediction_step(
         self,

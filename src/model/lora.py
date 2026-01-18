@@ -146,8 +146,24 @@ class LoRAModelForCausalLM:
         logger.info(f"Applying LoRA with config: {peft_config}")
         model = get_peft_model(base_model, peft_config)
 
+        # Ensure model is in train mode and parameters are trainable
+        model.train()
+        
+        # Explicitly ensure LoRA parameters require gradients
+        for name, param in model.named_parameters():
+            if "lora" in name.lower():
+                param.requires_grad = True
+        
         # Print trainable parameters
         model.print_trainable_parameters()
+        
+        # Verify that we have trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        if trainable_params == 0:
+            logger.error("WARNING: No trainable parameters found! LoRA may not be applied correctly.")
+            logger.error("This will cause training to fail. Please check LoRA configuration.")
+        else:
+            logger.info(f"✓ Model has {trainable_params:,} trainable parameters")
 
         return model
 
@@ -193,6 +209,23 @@ def get_lora_model(model_cfg: DictConfig):
             cache_dir=hf_home,
             **model_args,
         )
+        
+        # Ensure model is in train mode after loading
+        model.train()
+        
+        # Final verification: check trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in model.parameters())
+        logger.info(f"Model loaded - Trainable: {trainable_params:,} / Total: {total_params:,} parameters")
+        
+        if trainable_params == 0:
+            logger.error("CRITICAL: No trainable parameters found after model loading!")
+            logger.error("This will cause training to fail. Please check:")
+            logger.error("  1. LoRA configuration is correct")
+            logger.error("  2. Model was loaded with LoRA enabled")
+            logger.error("  3. device_map settings are compatible with training")
+            raise RuntimeError("Model has no trainable parameters. LoRA may not be applied correctly.")
+            
     except Exception as e:
         logger.warning(f"Model {model_path} requested with {model_cfg.model_args}")
         raise ValueError(

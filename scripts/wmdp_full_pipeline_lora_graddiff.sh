@@ -45,6 +45,11 @@ GPU_IDS=0  # GPU device IDs (use 0 for single GPU, 0,1 for multi-GPU)
 # Additional memory-saving options
 USE_8BIT_OPTIMIZER=true  # Use 8-bit optimizer to save memory (paged_adamw_32bit)
 
+# Device map configuration
+# If you encounter "no trainable parameters" error, try setting this to empty string or "cuda:0"
+# device_map="auto" may cause issues with LoRA parameter initialization
+USE_DEVICE_MAP="auto"  # Options: "auto", "cuda:0", "" (empty string for no device_map)
+
 # Set master port for distributed training
 export MASTER_PORT=$(python -c "import socket; s=socket.socket(); s.bind(('', 0)); print(s.getsockname()[1]); s.close()")
 echo "Master Port: $MASTER_PORT"
@@ -197,7 +202,6 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     task_name=${UNLEARN_TASK_NAME} \
     data_split=${DATA_SPLIT} \
     model.model_args.pretrained_model_name_or_path=${BASE_MODEL_PATH} \
-    model.model_args.device_map=auto \
     trainer.method_args.gamma=${GAMMA} \
     trainer.method_args.alpha=${ALPHA} \
     trainer.method_args.retain_loss_type=${RETAIN_LOSS_TYPE} \
@@ -208,6 +212,10 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
     trainer.args.gradient_checkpointing=True \
     trainer.args.dataloader_pin_memory=False"
+
+if [ -n "${USE_DEVICE_MAP:-}" ] && [ "${USE_DEVICE_MAP}" != "" ]; then
+    TRAIN_CMD="${TRAIN_CMD} model.model_args.device_map=${USE_DEVICE_MAP}"
+fi
 
 if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
     TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"

@@ -2,6 +2,7 @@ import os
 import json
 import logging
 import numpy as np
+import torch
 from evals.metrics import get_metrics
 from utils.logging import get_logger
 
@@ -133,16 +134,45 @@ class Evaluator:
                 "template_args": kwargs.get("template_args", None),
             }
             metrics_args = self.eval_cfg.metrics[metric_name]
-            _
-            result = metric_fn(
-                model,
-                metric_name=metric_name,
-                cache=logs,
-                **kwargs,
-                **metrics_args,
-            )
-            if "agg_value" in result:
-                logger.info(f"Result for metric {metric_name}:\t{result['agg_value']}")
+            try:
+                result = metric_fn(
+                    model,
+                    metric_name=metric_name,
+                    cache=logs,
+                    **kwargs,
+                    **metrics_args,
+                )
+                # Handle case where metric returns None (e.g., GPU OOM)
+                if result is None:
+                    logger.warning(
+                        f"Metric {metric_name} returned None (likely due to GPU OOM). "
+                        f"Skipping and continuing with other metrics."
+                    )
+                    logs[metric_name] = {
+                        "agg_value": None,
+                        "error": "Metric skipped due to resource constraints"
+                    }
+                else:
+                    if "agg_value" in result:
+                        logger.info(f"Result for metric {metric_name}:\t{result['agg_value']}")
+                    logs[metric_name] = result
+            except (RuntimeError, torch.cuda.OutOfMemoryError) as e:
+                error_str = str(e).lower()
+                if "out of memory" in error_str or ("cuda" in error_str and "memory" in error_str):
+                    logger.warning(
+                        f"GPU out of memory error during evaluation of {metric_name}. "
+                        f"Skipping this metric and continuing. Error: {e}"
+                    )
+                    logs[metric_name] = {
+                        "agg_value": None,
+                        "error": "GPU out of memory"
+                    }
+                    # Clear CUDA cache
+                    if torch.cuda.is_available():
+                        torch.cuda.empty_cache()
+                else:
+                    # Re-raise if it's not a GPU OOM error
+                    raise
             self.save_logs(logs, logs_file_path)
             self.save_logs(self.summarize(logs), summary_file_path)
 

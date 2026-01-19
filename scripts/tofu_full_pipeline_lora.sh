@@ -171,7 +171,7 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     forget_split=${FORGET_SPLIT} \
     holdout_split=${HOLDOUT_SPLIT} \
     model.model_args.pretrained_model_name_or_path=${MODEL_BASE_PATH} \
-    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
+    'eval.tofu.defaults.0.tofu_metrics=[forget_quality,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,privleak,extraction_strength,mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
 
 echo "✓ Original model evaluation completed"
 echo "Evaluation results saved to: saves/eval/${ORIGINAL_TASK_NAME}/TOFU_EVAL.json"
@@ -314,7 +314,7 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     forget_split=${FORGET_SPLIT} \
     holdout_split=${HOLDOUT_SPLIT} \
     model.model_args.pretrained_model_name_or_path=saves/finetune/${RETAIN_TASK_NAME} \
-    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
+    'eval.tofu.defaults.0.tofu_metrics=[forget_quality,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,privleak,extraction_strength,mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
 
 echo "✓ Retain model evaluation completed"
 echo "Evaluation results saved to: saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json"
@@ -389,7 +389,7 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     model.model_args.pretrained_model_name_or_path=saves/unlearn/${UNLEARN_TASK_NAME} \
     paths.output_dir=saves/unlearn/${UNLEARN_TASK_NAME}/evals \
     retain_logs_path=saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json \
-    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm,mia_reference]' \
+    'eval.tofu.defaults.0.tofu_metrics=[forget_quality,forget_Q_A_Prob,forget_Q_A_ROUGE,model_utility,privleak,extraction_strength,mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm,mia_reference]' \
     eval.tofu.metrics.mia_reference.reference_model_path=saves/finetune/${RETAIN_TASK_NAME}
 
 echo "✓ Unlearned model evaluation completed"

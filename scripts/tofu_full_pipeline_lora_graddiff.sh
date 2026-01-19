@@ -379,10 +379,14 @@ echo ""
 
 echo "Step 5: Evaluating unlearned model..."
 echo "-------------------------------------------"
+echo "This evaluation includes MIA (Membership Inference Attack) metrics to assess"
+echo "how well the model has forgotten the forget data."
+echo ""
 
 CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     --config-name=eval \
     experiment=eval/tofu/default \
+    eval=tofu_with_mia \
     model=${MODEL} \
     task_name=${UNLEARN_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
@@ -393,6 +397,7 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
 
 echo "✓ Unlearned model evaluation completed"
 echo "Evaluation results saved to: saves/unlearn/${UNLEARN_TASK_NAME}/evals/TOFU_EVAL.json"
+echo "Note: MIA metrics are included to assess forgetting quality."
 echo ""
 
 ########################################################################################################################

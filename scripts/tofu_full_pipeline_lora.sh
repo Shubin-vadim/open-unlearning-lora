@@ -158,6 +158,8 @@ fi
 
 echo "Step 0: Evaluating original model (baseline)..."
 echo "-------------------------------------------"
+echo "Note: Including MIA (Membership Inference Attack) metrics for baseline comparison."
+echo ""
 
 ORIGINAL_TASK_NAME="tofu_${MODEL}_original"
 
@@ -168,7 +170,8 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     task_name=${ORIGINAL_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
     holdout_split=${HOLDOUT_SPLIT} \
-    model.model_args.pretrained_model_name_or_path=${MODEL_BASE_PATH}
+    model.model_args.pretrained_model_name_or_path=${MODEL_BASE_PATH} \
+    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
 
 echo "✓ Original model evaluation completed"
 echo "Evaluation results saved to: saves/eval/${ORIGINAL_TASK_NAME}/TOFU_EVAL.json"
@@ -300,6 +303,8 @@ fi
 
 echo "Step 3: Evaluating retain model..."
 echo "-------------------------------------------"
+echo "Note: Including MIA (Membership Inference Attack) metrics."
+echo ""
 
 CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     --config-name=eval \
@@ -308,7 +313,8 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     task_name=${RETAIN_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
     holdout_split=${HOLDOUT_SPLIT} \
-    model.model_args.pretrained_model_name_or_path=saves/finetune/${RETAIN_TASK_NAME}
+    model.model_args.pretrained_model_name_or_path=saves/finetune/${RETAIN_TASK_NAME} \
+    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm]'
 
 echo "✓ Retain model evaluation completed"
 echo "Evaluation results saved to: saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json"
@@ -368,6 +374,10 @@ echo ""
 
 echo "Step 5: Evaluating unlearned model..."
 echo "-------------------------------------------"
+echo "Note: Including MIA (Membership Inference Attack) metrics to assess unlearning effectiveness."
+echo "      MIA metrics measure how well the model has 'forgotten' the forget data."
+echo "      Lower AUC values indicate better unlearning (model cannot distinguish forget from holdout)."
+echo ""
 
 CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     --config-name=eval \
@@ -378,10 +388,13 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     holdout_split=${HOLDOUT_SPLIT} \
     model.model_args.pretrained_model_name_or_path=saves/unlearn/${UNLEARN_TASK_NAME} \
     paths.output_dir=saves/unlearn/${UNLEARN_TASK_NAME}/evals \
-    retain_logs_path=saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json
+    retain_logs_path=saves/eval/${RETAIN_TASK_NAME}/TOFU_EVAL.json \
+    'eval.tofu.defaults.0.tofu_metrics+=[mia_loss,mia_min_k,mia_min_k_plus_plus,mia_zlib,mia_gradnorm,mia_reference]' \
+    eval.tofu.metrics.mia_reference.reference_model_path=saves/finetune/${RETAIN_TASK_NAME}
 
 echo "✓ Unlearned model evaluation completed"
 echo "Evaluation results saved to: saves/unlearn/${UNLEARN_TASK_NAME}/evals/TOFU_EVAL.json"
+echo "MIA metrics included: mia_loss, mia_min_k, mia_min_k_plus_plus, mia_zlib, mia_gradnorm, mia_reference"
 echo ""
 
 ########################################################################################################################

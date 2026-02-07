@@ -33,6 +33,10 @@ setup(
         "lm-eval": [
             "lm-eval==0.4.8",
         ],  # Install using `pip install .[lm-eval]`
+        "visualization": [
+            "matplotlib>=3.10.8",
+            "seaborn>=0.13.2",
+        ],  # Install using `pip install .[visualization]`
         "dev": [
             "pre-commit==4.0.1",
             "ruff==0.6.9",

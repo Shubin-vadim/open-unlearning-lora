@@ -1,0 +1,22 @@
+# Minimal visualization configuration - only loss curves
+
+defaults:
+  - default
+
+figure:
+  figsize: [10, 6]
+
+plot:
+  show_grad_norm: false
+  show_learning_rate: false
+  show_eval_metrics: false
+
+output:
+  auto_plot: true
+  formats:
+    - "png"
+  generate:
+    training_progress: false
+    loss_curve: true
+    metrics_summary: false
+

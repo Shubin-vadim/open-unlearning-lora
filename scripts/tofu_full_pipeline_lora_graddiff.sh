@@ -379,10 +379,14 @@ echo ""
 
 echo "Step 5: Evaluating unlearned model..."
 echo "-------------------------------------------"
+echo "This evaluation includes MIA (Membership Inference Attack) metrics to assess"
+echo "how well the model has forgotten the forget data."
+echo ""
 
 CUDA_VISIBLE_DEVICES=0 python src/eval.py \
     --config-name=eval \
     experiment=eval/tofu/default \
+    eval=tofu_with_mia \
     model=${MODEL} \
     task_name=${UNLEARN_TASK_NAME} \
     forget_split=${FORGET_SPLIT} \
@@ -393,6 +397,66 @@ CUDA_VISIBLE_DEVICES=0 python src/eval.py \
 
 echo "✓ Unlearned model evaluation completed"
 echo "Evaluation results saved to: saves/unlearn/${UNLEARN_TASK_NAME}/evals/TOFU_EVAL.json"
+echo "Note: MIA metrics are included to assess forgetting quality."
+echo ""
+
+########################################################################################################################
+########################################### Step 6: Generate Visualizations ###########################################
+########################################################################################################################
+
+echo "Step 6: Generating visualizations..."
+echo "-------------------------------------------"
+
+# Check if matplotlib is available
+if python -c "import matplotlib" 2>/dev/null; then
+    echo "Matplotlib found, generating visualizations..."
+    
+    # Create plots directory for comparisons
+    PLOTS_DIR="plots/${UNLEARN_TASK_NAME}"
+    mkdir -p "${PLOTS_DIR}"
+    
+    # Generate comparison plot: Fine-tune vs Unlearn
+    echo "Generating comparison plot..."
+    cd src
+    python -m plot compare \
+        -e "../saves/finetune/${FULL_TASK_NAME}" \
+        -e "../saves/unlearn/${UNLEARN_TASK_NAME}" \
+        -n "Fine-tune (Full)" \
+        -n "${TRAINER}" \
+        -o "../${PLOTS_DIR}/comparison.png" \
+        -t "TOFU: Fine-tune vs ${TRAINER} Unlearning" 2>/dev/null || echo "⚠️  Comparison plot generation failed (non-critical)"
+    
+    # Generate metrics comparison
+    echo "Generating metrics comparison..."
+    python -m plot metrics \
+        -e "../saves/finetune/${FULL_TASK_NAME}" \
+        -e "../saves/unlearn/${UNLEARN_TASK_NAME}" \
+        -o "../${PLOTS_DIR}/metrics_comparison.png" \
+        -t "TOFU: Metrics Comparison - ${TRAINER}" 2>/dev/null || echo "⚠️  Metrics comparison generation failed (non-critical)"
+    
+    # Generate dashboard if retain model exists
+    if [ -d "../saves/finetune/${RETAIN_TASK_NAME}" ]; then
+        echo "Generating dashboard..."
+        python -m plot dashboard \
+            -f "../saves/finetune/${FULL_TASK_NAME}" \
+            -u "../saves/unlearn/${UNLEARN_TASK_NAME}" \
+            -o "../${PLOTS_DIR}/dashboard.png" \
+            -t "TOFU: Unlearning Dashboard - ${TRAINER}" 2>/dev/null || echo "⚠️  Dashboard generation failed (non-critical)"
+    fi
+    
+    cd ..
+    
+    echo "✓ Visualizations saved to: ${PLOTS_DIR}/"
+    echo "  - comparison.png"
+    echo "  - metrics_comparison.png"
+    if [ -d "saves/finetune/${RETAIN_TASK_NAME}" ]; then
+        echo "  - dashboard.png"
+    fi
+else
+    echo "⚠️  Matplotlib not found. Skipping visualization generation."
+    echo "   Install with: pip install matplotlib seaborn"
+fi
+
 echo ""
 
 ########################################################################################################################

@@ -12,6 +12,44 @@ from utils.logging import setup_logging, get_logger
 logger = get_logger(__name__)
 
 
+def generate_training_plots(output_dir: str, task_name: str = None):
+    """
+    Generate visualization plots after training completes.
+    
+    Args:
+        output_dir: Training output directory containing trainer_state.json
+        task_name: Optional task name for plot title
+    """
+    try:
+        from utils.visualization import plot_training_progress, check_dependencies
+        import matplotlib
+        matplotlib.use('Agg')  # Non-interactive backend
+        import matplotlib.pyplot as plt
+        
+        check_dependencies()
+        
+        import os
+        plots_dir = os.path.join(output_dir, "plots")
+        os.makedirs(plots_dir, exist_ok=True)
+        
+        title = task_name or os.path.basename(output_dir)
+        
+        # Generate training progress plot
+        fig = plot_training_progress(
+            path=output_dir,
+            title=f"Training Progress: {title}",
+            save_path=os.path.join(plots_dir, "training_progress.png"),
+        )
+        plt.close(fig)
+        
+        logger.info(f"Training plots saved to: {plots_dir}")
+        
+    except ImportError as e:
+        logger.warning(f"Could not generate plots (missing dependencies): {e}")
+    except Exception as e:
+        logger.warning(f"Error generating training plots: {e}")
+
+
 @hydra.main(version_base=None, config_path="../configs", config_name="train.yaml")
 def main(cfg: DictConfig):
     """Entry point of the code to train models
@@ -97,6 +135,10 @@ def main(cfg: DictConfig):
         trainer.save_state()
         trainer.save_model(trainer_args.output_dir)
         logger.info(f"Model saved to {trainer_args.output_dir}")
+        
+        # Generate training visualization plots
+        task_name = cfg.get('task_name', None)
+        generate_training_plots(trainer_args.output_dir, task_name)
 
     if trainer_args.do_eval:
         logger.info("Starting evaluation...")

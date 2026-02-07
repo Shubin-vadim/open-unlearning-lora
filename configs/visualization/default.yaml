@@ -1,0 +1,72 @@
+# Visualization configuration for training and unlearning experiments
+
+# Figure settings
+figure:
+  figsize: [14, 8]  # Width, height in inches
+  dpi: 150
+  style: "seaborn-v0_8-whitegrid"
+
+# Plot settings
+plot:
+  # Loss curve settings
+  loss:
+    show_smoothed: true
+    smooth_weight: 0.9  # EMA factor for smoothing
+    alpha_raw: 0.3      # Alpha for raw data
+    linewidth: 2
+
+  # X-axis options: "step" or "epoch"
+  x_axis: "step"
+
+  # Subplots to show
+  show_grad_norm: true
+  show_learning_rate: true
+  show_eval_metrics: true
+
+# Color palette for methods
+colors:
+  finetune: "#2ecc71"
+  GradAscent: "#e74c3c"
+  GradDiff: "#9b59b6"
+  SimNPO: "#3498db"
+  NPO: "#2980b9"
+  DPO: "#f39c12"
+  RMU: "#e67e22"
+  CEU: "#d35400"
+  PDU: "#c0392b"
+  WGA: "#8e44ad"
+  UNDIAL: "#16a085"
+  SatImp: "#1abc9c"
+
+# Output settings
+output:
+  # Auto-generate plots after training
+  auto_plot: true
+  
+  # Output directory (relative to experiment output_dir)
+  subdir: "plots"
+  
+  # File formats to save
+  formats:
+    - "png"
+    # - "pdf"  # Uncomment for vector graphics
+  
+  # Individual plots to generate
+  generate:
+    training_progress: true
+    loss_curve: true
+    metrics_summary: true
+
+# Dashboard settings
+dashboard:
+  figsize: [16, 12]
+  show_table: true
+
+# Report settings
+report:
+  title: "Training Report"
+  generate_individual_plots: true
+  generate_comparison: true
+  generate_metrics: true
+  save_aggregate_json: true
+

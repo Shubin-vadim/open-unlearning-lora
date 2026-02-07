@@ -252,6 +252,46 @@ echo "Evaluation results saved to: saves/unlearn/${UNLEARN_TASK_NAME}/evals/LM_E
 echo ""
 
 ########################################################################################################################
+########################################### Step 3: Generate Visualizations ###########################################
+########################################################################################################################
+
+echo "Step 3: Generating visualizations..."
+echo "-------------------------------------------"
+
+# Check if matplotlib is available
+if python -c "import matplotlib" 2>/dev/null; then
+    echo "Matplotlib found, generating visualizations..."
+    
+    # Create plots directory for comparisons
+    PLOTS_DIR="plots/${UNLEARN_TASK_NAME}"
+    mkdir -p "${PLOTS_DIR}"
+    
+    # Generate metrics comparison if original evaluation exists
+    if [ -d "saves/eval/${ORIGINAL_TASK_NAME}" ]; then
+        echo "Generating metrics comparison..."
+        cd src
+        python -m plot metrics \
+            -e "../saves/eval/${ORIGINAL_TASK_NAME}" \
+            -e "../saves/unlearn/${UNLEARN_TASK_NAME}" \
+            -o "../${PLOTS_DIR}/metrics_comparison.png" \
+            -t "WMDP: Metrics Comparison - ${TRAINER}" 2>/dev/null || echo "⚠️  Metrics comparison generation failed (non-critical)"
+        cd ..
+    fi
+    
+    # Training progress plot is already generated automatically in saves/unlearn/${UNLEARN_TASK_NAME}/plots/
+    echo "✓ Visualizations saved to: ${PLOTS_DIR}/"
+    if [ -d "saves/eval/${ORIGINAL_TASK_NAME}" ]; then
+        echo "  - metrics_comparison.png"
+    fi
+    echo "  - Training progress: saves/unlearn/${UNLEARN_TASK_NAME}/plots/training_progress.png"
+else
+    echo "⚠️  Matplotlib not found. Skipping visualization generation."
+    echo "   Install with: pip install matplotlib seaborn"
+fi
+
+echo ""
+
+########################################################################################################################
 ########################################### Summary ####################################################################
 ########################################################################################################################
 

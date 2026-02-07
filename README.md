@@ -22,7 +22,7 @@
 We provide efficient and streamlined implementations of the TOFU, MUSE and WMDP unlearning benchmarks while supporting 12+ unlearning methods, 5+ datasets, 10+ evaluation metrics, and 7+ LLM architectures. Each of these can be easily extended to incorporate more variants.
 
 
-We invite the LLM unlearning community to collaborate by adding new benchmarks, unlearning methods, datasets and evaluation metrics here to expand OpenUnlearning's features, gain feedback from wider usage and drive progress in the field.
+We invite the LLM unlearning community to collaborate by adding new benchmarks, unlearning methods, datasets and evaluation metrics here to expand open-unlearning-lora's features, gain feedback from wider usage and drive progress in the field.
 
 ---
 
@@ -37,7 +37,7 @@ We invite the LLM unlearning community to collaborate by adding new benchmarks, 
 🚨 Our paper `OpenUnlearning: Accelerating LLM Unlearning via Unified Benchmarking of Methods and Metrics` is now out on [arXiv](https://arxiv.org/abs/2506.12618).
 
 🌟 **Highlights:**
-- A detailed technical report on OpenUnlearning covering the design, features, and implementation.
+- A detailed technical report on open-unlearning-lora covering the design, features, and implementation.
 - A meta-evaluation framework for benchmarking unlearning evaluations across 450+ models, open-sourced on HuggingFace 🤗: [TOFU Models w & w/o Knowledge](https://huggingface.co/collections/open-unlearning/tofu-models-w-and-w-o-knowledge-6861e4d935eb99ba162e55cd), [TOFU Unlearned Models](https://huggingface.co/collections/open-unlearning/tofu-unlearned-models-6860f6cf3fe35d0223d92e88).
 - Results benchmarking 8 diverse unlearning methods in one place using 10 evaluation metrics on TOFU.
 
@@ -52,7 +52,7 @@ We invite the LLM unlearning community to collaborate by adding new benchmarks, 
 #### [May 12, 2025]
 
 - **Another benchmark!** We now support running the [`WMDP`](https://wmdp.ai/) benchmark with its `Zephyr` task model.
-- **More evaluations!**  The [`lm-evaluation-harness`](https://github.com/EleutherAI/lm-evaluation-harness) toolkit has been integrated into OpenUnlearning, enabling WMDP evaluations and support for popular general LLM benchmarks, including MMLU, GSM8K, and others.
+- **More evaluations!**  The [`lm-evaluation-harness`](https://github.com/EleutherAI/lm-evaluation-harness) toolkit has been integrated into open-unlearning-lora, enabling WMDP evaluations and support for popular general LLM benchmarks, including MMLU, GSM8K, and others.
 
 #### [Apr 6, 2025]
 - **More Metrics!** Added 6 Membership Inference Attacks (MIA) (LOSS, ZLib, Reference, GradNorm, MinK, and MinK++), along with Extraction Strength (ES) and  Exact Memorization (EM) as additional evaluation metrics.
@@ -258,7 +258,7 @@ python setup_data.py --wmdp
 
 ### 🔄 Updated TOFU benchmark
 
-We've updated Open-Unlearning's TOFU benchmark target models to use a wider variety of newer architectures with sizes varying from 1B to 8B. These include Llama 3.2 1B, Llama 3.2 3B, Llama 3.1 8B, and the original Llama-2 7B (re-created) target models from [the old version of TOFU](github.com/locuslab/tofu). 
+We've updated open-unlearning-lora's TOFU benchmark target models to use a wider variety of newer architectures with sizes varying from 1B to 8B. These include Llama 3.2 1B, Llama 3.2 3B, Llama 3.1 8B, and the original Llama-2 7B (re-created) target models from [the old version of TOFU](github.com/locuslab/tofu). 
 
 For each architecture, we have finetuned with four different splits of the TOFU datasets: `full`, `retain90`, `retain95`, `retain99`, for a total of 16 finetuned models. The first serves as the target (base model for unlearning) and the rest are retain models used to measure performance against for each forget split. These models are on [HuggingFace](`https://huggingface.co/collections/open-unlearning/tofu-new-models-67bcf636334ea81727573a9f0`) and the paths to these models can be set in the experimental configs or in command-line overrides.
 
@@ -420,7 +420,7 @@ For more details about LoRA integration, see [`community/methods/LoRA/README.md`
 
 ### 📈 Visualization
 
-OpenUnlearning includes comprehensive visualization tools for analyzing training and unlearning experiments. Visualizations are automatically generated after each training run and can also be created manually using the CLI interface.
+open-unlearning-lora includes comprehensive visualization tools for analyzing training and unlearning experiments. Visualizations are automatically generated after each training run and can also be created manually using the CLI interface.
 
 **Automatic Visualization:**
 
@@ -512,7 +512,7 @@ If you encounter any issues or have questions, feel free to raise an issue in th
 
 ## 📝 Citing this work
 
-If you use OpenUnlearning in your research, please make sure to cite our OpenUnlearning technical report, the TOFU and MUSE benchmarks.
+If you use Open-Unlearning-Lora in your research, please make sure to cite our technical report (OpenUnlearning), the TOFU and MUSE benchmarks.
 
 ```bibtex
 @article{openunlearning2025,

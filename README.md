@@ -100,6 +100,7 @@ We provide several variants for each of the components in the unlearning pipelin
   - 📊 [Perform an Evaluation](#-perform-an-evaluation)
   - 📜 [Running Baseline Experiments](#-running-baseline-experiments)
   - 🎯 [Running Experiments with LoRA](#-running-experiments-with-lora)
+  - 📈 [Visualization](#-visualization)
 - ➕ [How to Contribute](#-how-to-contribute)
 - 📚 [Further Documentation](#-further-documentation)
 - 🔗 [Support & Contributors](#-support--contributors)
@@ -143,6 +144,13 @@ pip install .
 For evaluation with `lm-evaluation-harness` (required for WMDP and other general LLM benchmarks):
 ```bash
 pip install .[lm_eval]
+```
+
+**Optional: Install visualization dependencies (for plotting training curves and metrics)**
+```bash
+pip install .[visualization]
+# or directly:
+pip install matplotlib seaborn
 ```
 
 **Optional: Install flash-attention (for faster training, not required)**
@@ -401,6 +409,7 @@ All pipeline scripts include:
 - Automatic GPU cache clearing
 - Detailed progress logging with colored output
 - Configurable parameters at the top of each script
+- Automatic visualization generation (comparison plots, metrics charts, dashboards)
 
 **Available LoRA models:**
 - `Qwen2.5-3B-Instruct-lora` (default)
@@ -408,6 +417,69 @@ All pipeline scripts include:
 - `Llama-2-7b-chat-hf-lora`
 
 For more details about LoRA integration, see [`community/methods/LoRA/README.md`](community/methods/LoRA/README.md).
+
+### 📈 Visualization
+
+OpenUnlearning includes comprehensive visualization tools for analyzing training and unlearning experiments. Visualizations are automatically generated after each training run and can also be created manually using the CLI interface.
+
+**Automatic Visualization:**
+
+After each training/unlearning run, plots are automatically saved to `plots/` directory inside the experiment folder:
+- Fine-tuned models: `saves/finetune/{experiment_name}/plots/training_progress.png`
+- Unlearned models: `saves/unlearn/{experiment_name}/plots/training_progress.png`
+
+**Pipeline Scripts:**
+
+All full pipeline scripts (`*_full_pipeline_lora*.sh`) automatically generate comparison visualizations:
+- Loss curve comparisons (fine-tune vs unlearn)
+- Metrics comparison charts
+- Comprehensive dashboards (when retain models are available)
+
+**Manual Visualization:**
+
+Use the CLI interface to create custom visualizations:
+
+```bash
+cd src
+
+# Plot training progress for a single experiment
+python -m plot single --path ../saves/finetune/tofu_Qwen2.5-3B-Instruct_full
+
+# Compare multiple experiments
+python -m plot compare \
+    -e ../saves/finetune/tofu_Qwen2.5-3B-Instruct_full \
+    -e ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_GradAscent \
+    -e ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_SimNPO \
+    -o ../plots/comparison.png
+
+# Compare evaluation metrics
+python -m plot metrics \
+    -e ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_GradAscent \
+    -e ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_SimNPO \
+    -o ../plots/metrics.png
+
+# Create comprehensive dashboard
+python -m plot dashboard \
+    -f ../saves/finetune/tofu_Qwen2.5-3B-Instruct_full \
+    -u ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_GradAscent \
+    -u ../saves/unlearn/tofu_Qwen2.5-3B-Instruct_forget10_SimNPO \
+    -o ../plots/dashboard.png
+
+# Generate full report
+python -m plot report \
+    -d ../saves/unlearn \
+    --pattern "tofu_*" \
+    -o ../plots/reports/tofu
+```
+
+**Available Visualizations:**
+
+- **Training Progress**: Loss curves, learning rate schedules, gradient norms, and evaluation metrics over training steps
+- **Comparison Plots**: Side-by-side comparison of multiple experiments
+- **Metrics Comparison**: Bar charts comparing evaluation metrics across experiments
+- **Dashboards**: Comprehensive multi-panel visualizations combining loss curves, metrics, and summary tables
+
+For detailed documentation on visualization features, see [`docs/visualization.md`](docs/visualization.md).
 
 ---
 
@@ -426,6 +498,7 @@ For more in-depth information on specific aspects of the framework, refer to the
 | [`docs/evaluation.md`](docs/evaluation.md)       | Detailed instructions on creating and running evaluation metrics and benchmarks.                                     |
 | [`docs/experiments.md`](docs/experiments.md)     | Guide on running experiments in various configurations and settings, including distributed training, fine-tuning, and overriding arguments. |
 | [`docs/hydra.md`](docs/hydra.md)                 | A short tutorial on Hydra features, Hydra is the configuration management package we use extensively.                                  |
+| [`docs/visualization.md`](docs/visualization.md) | Comprehensive guide on visualizing training curves, comparing experiments, and generating reports. |
 | [`community/leaderboard.md`](community/leaderboard.md)             | Reference results from various unlearning methods run using this framework on TOFU and MUSE benchmarks.              |
 | [`docs/links.md`](docs/links.md)             | List of all links to the research papers or other sources the implemented features are sourced from.              |
 | [`docs/repro.md`](docs/repro.md)            | Results are provided solely for reproducibility purposes, without any parameter tuning.             |

@@ -3,11 +3,14 @@
 # Full Pipeline Script for WMDP Benchmark with LoRA - SimNPO Method
 # This script demonstrates a complete workflow:
 # 0. Evaluating original model (baseline)
-# 1. Unlearning using SimNPO (Simplified Negative Preference Optimization)
-# 2. Evaluating unlearned model
+# 1. Fine-tuning on WMDP full dataset (forget + retain)
+# 2. Fine-tuning retain model
+# 3. Evaluating retain model
+# 4. Unlearning using SimNPO (Simplified Negative Preference Optimization)
+# 5. Evaluating unlearned model
 #
 # NOTE: WMDP typically uses pre-trained models from HuggingFace.
-# This script assumes you're starting from a base model and doing unlearning.
+# This script now includes fine-tuning steps to match TOFU and MUSE benchmarks.
 #
 # Memory Requirements: Low-Medium
 # - Does NOT create a reference model (more memory efficient than NPO)
@@ -170,10 +173,144 @@ echo "Evaluation results saved to: saves/eval/${ORIGINAL_TASK_NAME}/LM_EVAL.json
 echo ""
 
 ########################################################################################################################
-########################################### Step 1: Unlearning #######################################################
+########################################### Step 1: Fine-tune on WMDP Full ###########################################
+########################################################################################################################
+# NOTE: Full dataset contains ALL data (forget + retain). This model knows everything and serves as the starting point
+# for unlearning. The unlearning process will try to "forget" the forget data while preserving retain knowledge.
+
+echo "Step 1: Fine-tuning on WMDP ${DATA_SPLIT} full dataset..."
+echo "-------------------------------------------"
+echo "Note: Full dataset = forget data + retain data (all data together)"
+echo "      This model will serve as the starting point for unlearning."
+echo ""
+
+FULL_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_full"
+
+TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
+    --config-name=train \
+    experiment=finetune/wmdp/lora \
+    model=${MODEL} \
+    +model.use_lora=true \
+    +model.lora_config.target_modules='[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\",\"lm_head\"]' \
+    +model.lora_config.lora_alpha=128 \
+    +model.lora_config.lora_dropout=0.05 \
+    +model.lora_config.r=128 \
+    +model.lora_config.bias=none \
+    +model.lora_config.task_type=CAUSAL_LM \
+    task_name=${FULL_TASK_NAME} \
+    data_split=${DATA_SPLIT} \
+    data_sub_set=full \
+    trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
+    trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
+    trainer.args.gradient_checkpointing=True \
+    model.model_args.pretrained_model_name_or_path=${BASE_MODEL_PATH}"
+
+if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
+    TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"
+fi
+
+# Clear GPU cache before training
+echo "Clearing GPU cache before training..."
+python -c "import torch; torch.cuda.empty_cache()" || true
+
+eval $TRAIN_CMD
+
+echo "✓ Fine-tuning on full dataset completed"
+echo "Model saved to: saves/finetune/${FULL_TASK_NAME}"
+echo ""
+
+########################################################################################################################
+########################################### Step 2: Fine-tune Retain Model ###########################################
+########################################################################################################################
+# NOTE: Retain dataset contains ONLY retain data (without forget data). This model represents the "ideal" target:
+# a model that never saw forget data. It's used as a reference to evaluate unlearning quality.
+# 
+# Why train both Full and Retain models?
+# - Full model: knows everything (forget + retain) - this is what we start with
+# - Retain model: knows only retain data - this is what we want to achieve through unlearning
+# - Unlearning: transforms Full model → something similar to Retain model (forgets forget, keeps retain)
+#
+# If you already have a retain model (e.g., from HuggingFace or previous experiments), you can skip this step
+# and set RETAIN_MODEL_PATH variable below to use an existing model instead.
+
+RETAIN_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_retain"
+
+# Uncomment and set this if you want to use an existing retain model instead of training one
+# RETAIN_MODEL_PATH="open-unlearning/wmdp_${MODEL}_${DATA_SPLIT}_retain"  # or path to your existing model
+# SKIP_RETAIN_TRAINING=true
+
+if [ -z "${SKIP_RETAIN_TRAINING:-}" ]; then
+    echo "Step 2: Fine-tuning retain model on ${DATA_SPLIT} retain dataset..."
+    echo "-------------------------------------------"
+    echo "Note: Retain dataset = ONLY retain data (without forget data)"
+    echo "      This model represents the ideal target: a model that never saw forget data."
+    echo "      It's used as a reference for forget_quality metric evaluation."
+    echo ""
+
+    TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
+        --config-name=train \
+        experiment=finetune/wmdp/lora \
+        model=${MODEL} \
+        +model.use_lora=true \
+        +model.lora_config.target_modules='[\"q_proj\",\"v_proj\",\"k_proj\",\"o_proj\",\"gate_proj\",\"down_proj\",\"up_proj\",\"lm_head\"]' \
+        +model.lora_config.lora_alpha=128 \
+        +model.lora_config.lora_dropout=0.05 \
+        +model.lora_config.r=128 \
+        +model.lora_config.bias=none \
+        +model.lora_config.task_type=CAUSAL_LM \
+        task_name=${RETAIN_TASK_NAME} \
+        data_split=${DATA_SPLIT} \
+        data_sub_set=retain \
+        data/datasets@data.train=WMDP_retain \
+        data.train.WMDP_retain.args.hf_args.data_files=\"data/wmdp/wmdp-corpora/${DATA_SPLIT}-retain-corpus.jsonl\" \
+        trainer.args.per_device_train_batch_size=${PER_DEVICE_TRAIN_BATCH_SIZE} \
+        trainer.args.gradient_accumulation_steps=${GRADIENT_ACCUMULATION_STEPS} \
+        trainer.args.gradient_checkpointing=True \
+        model.model_args.pretrained_model_name_or_path=${BASE_MODEL_PATH}"
+
+    if [ "${USE_8BIT_OPTIMIZER:-false}" = "true" ]; then
+        TRAIN_CMD="${TRAIN_CMD} trainer.args.optim=paged_adamw_32bit"
+    fi
+
+    # Clear GPU cache before training
+    echo "Clearing GPU cache before training..."
+    python -c "import torch; torch.cuda.empty_cache()" || true
+
+    eval $TRAIN_CMD
+
+    echo "✓ Fine-tuning retain model completed"
+    echo "Model saved to: saves/finetune/${RETAIN_TASK_NAME}"
+    echo ""
+else
+    echo "Step 2: Skipping retain model training (using existing model: ${RETAIN_MODEL_PATH})"
+    echo "-------------------------------------------"
+    echo ""
+fi
+
+########################################################################################################################
+########################################### Step 3: Evaluate Retain Model ###########################################
 ########################################################################################################################
 
-echo "Step 1: Unlearning using ${TRAINER}..."
+echo "Step 3: Evaluating retain model..."
+echo "-------------------------------------------"
+
+CUDA_VISIBLE_DEVICES=0 python src/eval.py \
+    --config-name=eval \
+    experiment=eval/wmdp/default \
+    model=${MODEL} \
+    task_name=${RETAIN_TASK_NAME} \
+    data_split=${DATA_SPLIT} \
+    model.model_args.pretrained_model_name_or_path=saves/finetune/${RETAIN_TASK_NAME}
+
+echo "✓ Retain model evaluation completed"
+echo "Evaluation results saved to: saves/finetune/${RETAIN_TASK_NAME}/evals/LM_EVAL.json"
+echo ""
+
+########################################################################################################################
+########################################### Step 4: Unlearning #######################################################
+########################################################################################################################
+
+echo "Step 4: Unlearning using ${TRAINER}..."
 echo "-------------------------------------------"
 echo "Note: WMDP unlearning uses forget and retain corpora"
 echo "      Forget corpus: data/wmdp/wmdp-corpora/${DATA_SPLIT}-forget-corpus.jsonl"
@@ -184,6 +321,9 @@ echo "without requiring a reference model, making it more memory efficient than 
 echo ""
 
 UNLEARN_TASK_NAME="wmdp_${MODEL}_${DATA_SPLIT}_${TRAINER}"
+
+# Use fine-tuned full model as starting point instead of base model
+FULL_MODEL_PATH="saves/finetune/${FULL_TASK_NAME}"
 
 TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     --config-name=unlearn \
@@ -199,7 +339,7 @@ TRAIN_CMD="CUDA_VISIBLE_DEVICES=$GPU_IDS python src/train.py \
     trainer=${TRAINER} \
     task_name=${UNLEARN_TASK_NAME} \
     data_split=${DATA_SPLIT} \
-    model.model_args.pretrained_model_name_or_path=${BASE_MODEL_PATH} \
+    model.model_args.pretrained_model_name_or_path=${FULL_MODEL_PATH} \
     trainer.method_args.delta=${DELTA} \
     trainer.method_args.beta=${BETA} \
     trainer.method_args.gamma=${GAMMA} \
@@ -232,10 +372,10 @@ echo "Unlearned model saved to: saves/unlearn/${UNLEARN_TASK_NAME}"
 echo ""
 
 ########################################################################################################################
-########################################### Step 2: Evaluate Unlearned Model #########################################
+########################################### Step 5: Evaluate Unlearned Model #########################################
 ########################################################################################################################
 
-echo "Step 2: Evaluating unlearned model..."
+echo "Step 5: Evaluating unlearned model..."
 echo "-------------------------------------------"
 
 CUDA_VISIBLE_DEVICES=0 python src/eval.py \
@@ -252,10 +392,10 @@ echo "Evaluation results saved to: saves/unlearn/${UNLEARN_TASK_NAME}/evals/LM_E
 echo ""
 
 ########################################################################################################################
-########################################### Step 3: Generate Visualizations ###########################################
+########################################### Step 6: Generate Visualizations ###########################################
 ########################################################################################################################
 
-echo "Step 3: Generating visualizations..."
+echo "Step 6: Generating visualizations..."
 echo "-------------------------------------------"
 
 # Check if matplotlib is available
@@ -272,18 +412,22 @@ if python -c "import matplotlib" 2>/dev/null; then
         cd src
         python -m plot metrics \
             -e "../saves/eval/${ORIGINAL_TASK_NAME}" \
+            -e "../saves/finetune/${FULL_TASK_NAME}" \
+            -e "../saves/finetune/${RETAIN_TASK_NAME}" \
             -e "../saves/unlearn/${UNLEARN_TASK_NAME}" \
             -o "../${PLOTS_DIR}/metrics_comparison.png" \
             -t "WMDP: Metrics Comparison - ${TRAINER}" 2>/dev/null || echo "⚠️  Metrics comparison generation failed (non-critical)"
         cd ..
     fi
     
-    # Training progress plot is already generated automatically in saves/unlearn/${UNLEARN_TASK_NAME}/plots/
+    # Training progress plots are already generated automatically
     echo "✓ Visualizations saved to: ${PLOTS_DIR}/"
     if [ -d "saves/eval/${ORIGINAL_TASK_NAME}" ]; then
         echo "  - metrics_comparison.png"
     fi
-    echo "  - Training progress: saves/unlearn/${UNLEARN_TASK_NAME}/plots/training_progress.png"
+    echo "  - Fine-tune training progress: saves/finetune/${FULL_TASK_NAME}/plots/training_progress.png"
+    echo "  - Retain training progress: saves/finetune/${RETAIN_TASK_NAME}/plots/training_progress.png"
+    echo "  - Unlearn training progress: saves/unlearn/${UNLEARN_TASK_NAME}/plots/training_progress.png"
 else
     echo "⚠️  Matplotlib not found. Skipping visualization generation."
     echo "   Install with: pip install matplotlib seaborn"
@@ -299,6 +443,9 @@ echo "=========================================="
 echo "Pipeline Summary"
 echo "=========================================="
 echo "✓ Original model evaluation: saves/eval/${ORIGINAL_TASK_NAME}/LM_EVAL.json"
+echo "✓ Fine-tuned full model: saves/finetune/${FULL_TASK_NAME}"
+echo "✓ Fine-tuned retain model: saves/finetune/${RETAIN_TASK_NAME}"
+echo "✓ Retain model evaluation: saves/finetune/${RETAIN_TASK_NAME}/evals/LM_EVAL.json"
 echo "✓ Unlearned model: saves/unlearn/${UNLEARN_TASK_NAME}"
 echo "✓ Unlearned evaluation: saves/unlearn/${UNLEARN_TASK_NAME}/evals/LM_EVAL.json"
 echo "=========================================="

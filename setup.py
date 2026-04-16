@@ -27,7 +27,7 @@ setup(
         "scipy>=1.14.1",
         "tensorboard>=2.18.0",
         "scikit-learn>=1.5.2",
-        "peft>=0.19.1",
+        "peft>=0.19.0",
         "python-dotenv>=1.2.1",
     ],
     extras_require={

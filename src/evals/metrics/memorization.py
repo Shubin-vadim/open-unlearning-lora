@@ -123,11 +123,12 @@ def rouge(model, **kwargs):
             for evals in scores_by_index.values()
             if evals[kwargs["rouge_type"]] is not None
         ],
-        device=device
+        device=device,
+        dtype=torch.float32,
     )
     rouge_values = aggregate_to_1D(rouge_values)
     return {
-        "agg_value": float(torch.mean(rouge_values).item()),
+        "agg_value": float(torch.mean(rouge_values.float()).item()),
         "value_by_index": scores_by_index,
     }
 

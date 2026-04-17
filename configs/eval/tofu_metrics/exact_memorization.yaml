@@ -5,7 +5,7 @@ defaults:
   # ^ get default dataset and generation config information
 
 handler: exact_memorization
-batch_size: ${eval.tofu.batch_size}
+batch_size: 2
 
 datasets:
   TOFU_QA_forget:

@@ -5,7 +5,8 @@ defaults:
   # ^ get default dataset and generation config information
 
 handler: extraction_strength
-batch_size: ${eval.tofu.batch_size}
+# Do not inherit eval.tofu.batch_size: this metric materializes (B × L × vocab) tensors.
+batch_size: 2
 
 datasets:
   TOFU_QA_forget:
